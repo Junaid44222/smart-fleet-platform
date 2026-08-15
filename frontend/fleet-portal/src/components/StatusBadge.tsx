@@ -6,7 +6,9 @@ interface StatusBadgeProps extends Omit<ChipProps, 'color'> {
   status: 'active' | 'inactive' | 'maintenance' | 'alert' | 'warning' | 'success' | 'error';
 }
 
-const statusConfig: Record<string, { color: any; label?: string }> = {
+type StatusColor = NonNullable<ChipProps['color']>;
+
+const statusConfig: Record<StatusBadgeProps['status'], { color: StatusColor }> = {
   active: { color: 'success' },
   inactive: { color: 'default' },
   maintenance: { color: 'warning' },
@@ -17,7 +19,7 @@ const statusConfig: Record<string, { color: any; label?: string }> = {
 };
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, ...props }) => {
-  const config = statusConfig[status] || statusConfig.inactive;
+  const config = statusConfig[status];
 
   return (
     <Chip

@@ -34,6 +34,39 @@ export interface Driver {
   isDeleted: boolean;
 }
 
+export interface MaintenanceRecord {
+  id: string;
+  vehicleId: string;
+  serviceType: string;
+  description: string;
+  scheduledDate: string;
+  completedDate?: string | null;
+  cost: number;
+  vendor: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  createdBy: string;
+  updatedBy?: string | null;
+  isDeleted: boolean;
+  vehicle?: Vehicle | null;
+}
+
+export interface FuelRecord {
+  id: string;
+  vehicleId: string;
+  fuelDate: string;
+  quantity: number;
+  cost: number;
+  odometerReading: number;
+  createdAt: string;
+  updatedAt?: string | null;
+  createdBy: string;
+  updatedBy?: string | null;
+  isDeleted: boolean;
+  vehicle?: Vehicle | null;
+}
+
 export interface DashboardStats {
   totalVehicles: number;
   activeTrips: number;

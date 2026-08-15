@@ -1,17 +1,22 @@
 import React from 'react';
 import { Box, Card, CardContent, Chip, Divider, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { AccountCircle, Email, Phone, Shield } from '@mui/icons-material';
 import PageHeader from '../../../components/PageHeader';
 
-const ProfilePage: React.FC = () => (
-  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-    <PageHeader
-      title="Profile"
-      subtitle="Manage your account preferences and fleet access details."
-    />
+const ProfilePage: React.FC = () => {
+  const navigate = useNavigate();
 
-    <Card>
-      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <PageHeader
+        title="Profile"
+        subtitle="Manage your account preferences and fleet access details."
+        onBack={() => navigate(-1)}
+      />
+
+      <Card>
+        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <AccountCircle sx={{ fontSize: 52, color: 'primary.main' }} />
@@ -42,8 +47,9 @@ const ProfilePage: React.FC = () => (
           </Box>
         </Box>
       </CardContent>
-    </Card>
-  </Box>
-);
+      </Card>
+    </Box>
+  );
+};
 
 export default ProfilePage;

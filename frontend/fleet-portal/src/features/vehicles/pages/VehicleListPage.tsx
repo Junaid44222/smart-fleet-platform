@@ -22,11 +22,26 @@ import FilterBar from '../../../components/FilterBar';
 import DataTable from '../../../components/DataTable';
 import StatusBadge from '../../../components/StatusBadge';
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 const statusOptions = [
   { label: 'Active', value: 'active' },
   { label: 'Inactive', value: 'inactive' },
   { label: 'Maintenance', value: 'maintenance' },
 ];
+
+type VehicleStatusBadge = 'active' | 'inactive' | 'maintenance';
+
+const toVehicleStatus = (status: string): VehicleStatusBadge => {
+  const normalized = status.toLowerCase();
+  return normalized === 'inactive' || normalized === 'maintenance' ? normalized : 'active';
+};
 
 const VehicleListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -62,7 +77,7 @@ const VehicleListPage: React.FC = () => {
     try {
       const data = await fetchVehicles();
       setVehicles(data);
-    } catch (err) {
+    } catch {
       setError('Unable to load vehicles at this time.');
     } finally {
       setLoading(false);
@@ -140,8 +155,9 @@ const VehicleListPage: React.FC = () => {
       });
       setOpenAddDialog(false);
       loadVehicles(); // Refresh table
-    } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Failed to create vehicle.');
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      setFormError(apiError.response?.data?.message || 'Failed to create vehicle.');
     } finally {
       setSubmitting(false);
     }
@@ -192,7 +208,9 @@ const VehicleListPage: React.FC = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (row: Vehicle) => <StatusBadge status={row.status.toLowerCase() as any} />,
+      render: (row: Vehicle) => (
+        <StatusBadge status={toVehicleStatus(row.status)} />
+      ),
     },
     {
       id: 'actions',
@@ -221,6 +239,7 @@ const VehicleListPage: React.FC = () => {
       <PageHeader
         title="Vehicle Inventory"
         subtitle="Manage and track details of your fleet vehicles"
+        onBack={() => navigate(-1)}
         action={
           <Button
             variant="contained"

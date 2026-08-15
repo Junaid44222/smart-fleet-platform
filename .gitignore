@@ -17,6 +17,7 @@ logs/
 node_modules/
 dist/
 coverage/
+frontend/fleet-portal/tmp_*.html
 
 # Environment and secrets
 .env

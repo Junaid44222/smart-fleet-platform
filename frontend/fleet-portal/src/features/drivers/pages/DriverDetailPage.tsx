@@ -9,7 +9,8 @@ import {
   Typography,
 } from '@mui/material';
 import { Email, Phone, Badge, CalendarToday } from '@mui/icons-material';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import PageHeader from '../../../components/PageHeader';
 import { fetchDriverById } from '../../../api/fleetApi';
 import type { Driver } from '../../../api/types';
 
@@ -26,7 +27,7 @@ const DriverDetailPage: React.FC = () => {
       try {
         const data = await fetchDriverById(id);
         setDriver(data ?? null);
-      } catch (err) {
+      } catch {
         setError('Unable to load driver details.');
       } finally {
         setLoading(false);
@@ -36,11 +37,15 @@ const DriverDetailPage: React.FC = () => {
     loadDriver();
   }, [id]);
 
+  const navigate = useNavigate();
+
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Driver Details
-      </Typography>
+      <PageHeader
+        title="Driver Details"
+        subtitle="View driver contact details, licence status, and compliance history."
+        onBack={() => navigate(-1)}
+      />
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />

@@ -1,26 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Typography,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   Build,
   LocalGasStation,
 } from '@mui/icons-material';
-import { useParams } from 'react-router-dom';
-import { fetchVehicleById } from '../../../api/fleetApi';
-import type { Vehicle } from '../../../api/types';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import PageHeader from '../../../components/PageHeader';
+import { fetchVehicleById, fetchDrivers } from '../../../api/fleetApi';
+import type { Driver, Vehicle } from '../../../api/types';
 
 const VehicleDetailPage: React.FC = () => {
   const { id } = useParams();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
+  const [assignedDriver, setAssignedDriver] = useState<Driver | null>(null);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [error, setError] = useState('');
+  const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
 
   useEffect(() => {
     const loadVehicle = async () => {
@@ -29,7 +48,7 @@ const VehicleDetailPage: React.FC = () => {
       try {
         const data = await fetchVehicleById(id);
         setVehicle(data ?? null);
-      } catch (err) {
+      } catch {
         setError('Unable to load vehicle details.');
       } finally {
         setLoading(false);
@@ -39,11 +58,46 @@ const VehicleDetailPage: React.FC = () => {
     loadVehicle();
   }, [id]);
 
+  useEffect(() => {
+    const loadDrivers = async () => {
+      try {
+        const data = await fetchDrivers();
+        setDrivers(data);
+      } catch {
+        setDrivers([]);
+      } finally {
+        setLoadingDrivers(false);
+      }
+    };
+
+    loadDrivers();
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = localStorage.getItem(`assignedDriver_${id}`);
+    if (stored) {
+      setAssignedDriverId(stored);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (assignedDriverId && drivers.length > 0) {
+      setAssignedDriver(drivers.find((driver) => driver.id === assignedDriverId) ?? null);
+    } else {
+      setAssignedDriver(null);
+    }
+  }, [assignedDriverId, drivers]);
+
+  const navigate = useNavigate();
+
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Vehicle Details
-      </Typography>
+      <PageHeader
+        title="Vehicle Details"
+        subtitle="Review vehicle metrics, fuel status, and maintenance readiness."
+        onBack={() => navigate(-1)}
+      />
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
@@ -52,6 +106,76 @@ const VehicleDetailPage: React.FC = () => {
         <Typography color="error">{error}</Typography>
       ) : vehicle ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Card sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', gap: 2 }}>
+                <Box>
+                  <Typography variant="h6">Assigned Driver</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {assignedDriver ? `${assignedDriver.firstName} ${assignedDriver.lastName}` : 'No driver assigned to this vehicle.'}
+                  </Typography>
+                </Box>
+                {userRole === 'Admin' && (
+                  <Button variant="contained" onClick={() => {
+                    setSelectedDriverId(assignedDriverId ?? '');
+                    setIsAssignOpen(true);
+                  }}>
+                    {assignedDriver ? 'Reassign Driver' : 'Assign Driver'}
+                  </Button>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Dialog open={isAssignOpen} onClose={() => setIsAssignOpen(false)} fullWidth maxWidth="sm">
+            <DialogTitle>{assignedDriver ? 'Reassign Driver' : 'Assign Driver'}</DialogTitle>
+            <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
+              {loadingDrivers ? (
+                <Typography>Loading drivers…</Typography>
+              ) : (
+                <FormControl fullWidth>
+                  <InputLabel id="driver-select-label">Driver</InputLabel>
+                  <Select
+                    labelId="driver-select-label"
+                    value={selectedDriverId}
+                    label="Driver"
+                    onChange={(event: SelectChangeEvent<string>) => setSelectedDriverId(event.target.value)}
+                  >
+                    <MenuItem value="">Unassign</MenuItem>
+                    {drivers.map((driver) => (
+                      <MenuItem key={driver.id} value={driver.id}>
+                        {driver.firstName} {driver.lastName} • {driver.employeeCode}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setIsAssignOpen(false)} color="secondary">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (id) {
+                    const value = selectedDriverId || '';
+                    if (value) {
+                      localStorage.setItem(`assignedDriver_${id}`, value);
+                      setAssignedDriverId(value);
+                    } else {
+                      localStorage.removeItem(`assignedDriver_${id}`);
+                      setAssignedDriverId(null);
+                    }
+                  }
+                  setIsAssignOpen(false);
+                }}
+                variant="contained"
+                disabled={loadingDrivers}
+              >
+                Save
+              </Button>
+            </DialogActions>
+          </Dialog>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', gap: 2 }}>

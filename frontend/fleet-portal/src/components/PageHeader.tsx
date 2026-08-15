@@ -1,13 +1,16 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
+import { ArrowBack } from '@mui/icons-material';
 
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
-const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, action }) => (
+const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, action, onBack, backLabel }) => (
   <Box
     sx={{
       display: 'flex',
@@ -28,7 +31,19 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, action }) => (
         </Typography>
       )}
     </Box>
-    {action}
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {onBack && (
+        <Button
+          variant="text"
+          startIcon={<ArrowBack />}
+          onClick={onBack}
+          sx={{ color: 'text.primary', textTransform: 'none' }}
+        >
+          {backLabel ?? 'Back'}
+        </Button>
+      )}
+      {action}
+    </Box>
   </Box>
 );
 

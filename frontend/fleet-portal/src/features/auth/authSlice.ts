@@ -4,6 +4,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 interface AuthState {
   isAuthenticated: boolean;
   userName: string;
+  userRole: string;
 }
 
 const getInitialAuthState = (): AuthState => {
@@ -11,12 +12,14 @@ const getInitialAuthState = (): AuthState => {
     return {
       isAuthenticated: false,
       userName: '',
+      userRole: 'User',
     };
   }
 
   return {
     isAuthenticated: Boolean(localStorage.getItem('authToken')),
     userName: localStorage.getItem('authUserName') ?? '',
+    userRole: localStorage.getItem('authUserRole') ?? 'User',
   };
 };
 
@@ -26,13 +29,15 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    login(state, action: PayloadAction<string>) {
+    login(state, action: PayloadAction<{ userName: string; userRole: string }>) {
       state.isAuthenticated = true;
-      state.userName = action.payload;
+      state.userName = action.payload.userName;
+      state.userRole = action.payload.userRole;
     },
     logout(state) {
       state.isAuthenticated = false;
       state.userName = '';
+      state.userRole = 'User';
     },
   },
 });

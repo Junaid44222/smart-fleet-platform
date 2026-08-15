@@ -2,11 +2,11 @@
 
 # Smart Fleet Platform - Development Tracker
 
-Last Updated: 2026-08-08
+Last Updated: 2026-08-15
 
 Project Status: In Progress
 
-Overall Completion: 82% (Frontend: 100% | Backend: 75% | Integration: 15%)
+Overall Completion: 84% (Frontend: 65% | Backend: 75% | Integration: 20%)
 
 ---
 
@@ -125,6 +125,17 @@ Completion: Phase 1 (Testing) = 25% | Phase 2 (Issues Fix) = 0% | Phase 3 (Valid
  - Added `.github/workflows/e2e.yml` to run the E2E script on a daily schedule or via manual dispatch; set `E2E_BASE_URL`, `E2E_AUTH_EMAIL`, and `E2E_AUTH_PASSWORD` as repository secrets to target deployed environments and test authenticated endpoints.
  - Local test: executed the script against the development environment; `AI Gateway Health` and `AI Direct Health` passed, `Fleet Vehicles` skipped because no credentials were provided locally (script exits non-zero if a required auth endpoint lacks token).
  - Local test: executed the script against the development environment; `AI Gateway Health` and `AI Direct Health` passed. Implemented auto-registration fallback: when no credentials are provided the script will auto-register a temporary user via Identity `/api/Auth/register`, then login to acquire a JWT and exercise authenticated endpoints — local run passed all required checks.
+
+### Frontend Integration Pass (2026-08-15)
+
+- Completed Vehicle Inventory searchable data table verification and kept add/view flows wired to Fleet APIs.
+- Wired Maintenance Dashboard to live `/fleet/MaintenanceRecords` data with KPI summaries, loading/error states, and a records table.
+- Wired Fuel Dashboard to live `/fleet/FuelRecords` data with spend/volume/average-cost summaries, loading/error states, and a records table.
+- Added typed frontend models and API clients for maintenance and fuel records.
+- Connected AI Assistant UI to the AI chat API through `src/api/aiApi.ts`.
+- Fixed frontend lint configuration and type hygiene so `npm run lint` passes.
+- Removed incomplete backend vehicle update/driver mapping code from the working change because it lacked domain properties, commands, handlers, and migrations.
+- Local verification: `npm.cmd run lint` passed, `npm.cmd run build` passed, `dotnet build SmartFleetPlatform.slnx --no-restore -p:BaseOutputPath="$env:TEMP\smartfleet-build\"` passed, and `dotnet test SmartFleetPlatform.slnx --no-restore -p:BaseOutputPath="$env:TEMP\smartfleet-test\"` passed.
 
 
 Notes:
@@ -514,9 +525,10 @@ Tasks:
 * [x] Implement Dashboard Stats API
 * [x] Rebuild Fleet Manager dashboard (KPIs, charts, activity feed)
 * [x] Apply dark sidebar layout and shared components
-* [ ] Rebuild Vehicle Inventory as searchable data table
-* [ ] Wire Maintenance and Fuel pages to APIs
-* [ ] Build AI Assistant page
+* [x] Rebuild Vehicle Inventory as searchable data table
+* [x] Wire Maintenance and Fuel pages to APIs
+* [x] Build AI Assistant page
+* [ ] Replace local vehicle-driver assignment storage with backend assignment API
 
 Estimated:
 3-5 Days
@@ -699,7 +711,7 @@ Notification Service:
 75%
 
 Frontend:
-35%
+65%
 
 Trip Management:
 0%
@@ -711,4 +723,4 @@ Production Readiness:
 25%
 
 Overall Progress:
-68%
+84%

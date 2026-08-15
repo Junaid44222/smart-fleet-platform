@@ -28,13 +28,14 @@ const LoginPage: React.FC = () => {
         const token = response.data.token;
         localStorage.setItem('authToken', token);
         localStorage.setItem('authUserName', 'David');
+        localStorage.setItem('authUserRole', 'Admin');
         setAuthToken(token);
-        dispatch(login('David'));
+        dispatch(login({ userName: 'David', userRole: 'Admin' }));
         navigate('/dashboard');
       } else {
         setError(response.data.message ?? 'Invalid login attempt');
       }
-    } catch (err) {
+    } catch {
       setError('Login failed. Please check your credentials and try again.');
     }
   };

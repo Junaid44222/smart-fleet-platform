@@ -36,7 +36,7 @@ const RegisterPage: React.FC = () => {
       } else {
         setError(response.data.message ?? 'Registration failed');
       }
-    } catch (err) {
+    } catch {
       setError('Registration failed. Please try again later.');
     }
   };
