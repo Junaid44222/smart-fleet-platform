@@ -12,9 +12,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell@v4
-
       - name: Run E2E script
         env:
           E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
