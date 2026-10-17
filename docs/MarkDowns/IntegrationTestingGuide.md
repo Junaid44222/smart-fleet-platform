@@ -22,6 +22,8 @@ ollama list
 
 The AI service development settings use `http://localhost:11434/v1` and model `qwen3:0.6b`. Restart the AI service after configuration changes. If Ollama is already running, do not start a second `ollama serve` process.
 
+For registered-vehicle questions, sign in to the portal first so the request includes the fleet JWT. For example, ask `What is the fuel capacity of MH01AB1005?`; the AI service looks up that registration through the gateway and grounds its answer in the matching FleetService record.
+
 To use Azure OpenAI instead, set these environment variables before starting the AI service; keep the key out of source control:
 
 ```powershell

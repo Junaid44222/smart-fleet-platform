@@ -171,14 +171,16 @@ Notes:
 ### Local Ollama Provider (2026-10-18)
 
 - Added provider selection with Ollama and Azure OpenAI support; development settings select Ollama at `http://localhost:11434/v1` using model `qwen3:0.6b`.
-- Added unit coverage for Ollama URL/model/auth/response parsing and Azure deployment URL/key compatibility; AI service tests pass 5/5.
+- Added unit coverage for Ollama URL/model/auth/response parsing, Azure deployment URL/key compatibility, and authenticated vehicle context lookup; AI service tests pass 6/6.
 - Installed `qwen3:0.6b` locally with Ollama. Built and ran the updated AI API on port 5092; both `/api/AiAssistant/chat` and `/api/AiAssistant/fleet-health` returned successful responses from the local model without Azure credentials.
 - Raised the AI HTTP client timeout to 3 minutes; the first cold chat took about 94 seconds and the subsequent fleet-health response about 6 seconds.
 - Fixed the gateway AI route: `/ai/health` maps directly to `/health`, while `/ai/{everything}` maps to the controller `/api/{everything}` path; this resolves the chat 404.
 - Restarted AIService on port 5091 with the Ollama Development configuration; `/ai/health` remains healthy through the gateway.
 - Submitted a real prompt from the signed-in browser and verified the Ollama-generated answer rendered through Vite, API Gateway, and AIService.
 - Verified `/ai/AiAssistant/fleet-health` also returns a successful local analysis through the gateway.
-- Next: connect the existing fleet-health analysis endpoint to the AI Assistant UI.
+- Added registration-aware FleetService lookup: the AI chat extracts a vehicle registration, forwards the signed-in user's bearer token to `/fleet/Vehicles`, and gives matching verified vehicle specifications to the model.
+- Verified the exact question `what is the Fuel capacity of MH01AB1005 vehicle registered in Smart fleet system` through the gateway and signed-in browser; answer: `The fuel capacity of MH01AB1005 is 350 litres.`
+- Next: extend grounded context to maintenance and fuel-record questions and add coverage for unknown registrations.
 
 ---
 

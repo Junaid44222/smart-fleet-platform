@@ -1,4 +1,5 @@
 using AiService.Application.DTOs;
+using AiService.Infrastructure.Clients;
 using AiService.Infrastructure.Options;
 using AiService.Infrastructure.Services;
 using Microsoft.Extensions.Options;
@@ -117,6 +118,26 @@ namespace AiService.Tests
             Assert.DoesNotContain("\"model\"", handler.RequestBody);
         }
 
+        [Fact]
+        public async Task FleetVehicleContextProvider_ReturnsVerifiedDetails_AndForwardsBearerToken()
+        {
+            var handler = new StubFleetDataHandler();
+            using var httpClient = new HttpClient(handler)
+            {
+                BaseAddress = new Uri("http://localhost:5000/")
+            };
+            var provider = new FleetVehicleContextProvider(httpClient);
+
+            var context = await provider.GetVehicleContextAsync(
+                "What is the fuel capacity of MH01AB1005?",
+                "Bearer test-token",
+                CancellationToken.None);
+
+            Assert.Contains("fuel capacity 350 litres", context);
+            Assert.Equal("Bearer test-token", handler.Authorization);
+            Assert.Equal("/fleet/Vehicles", handler.RequestUri.AbsolutePath);
+        }
+
         private sealed class StubMessageHandler : HttpMessageHandler
         {
             public Uri RequestUri { get; private set; } = new("about:blank");
@@ -145,6 +166,29 @@ namespace AiService.Tests
                         Encoding.UTF8,
                         "application/json")
                 };
+            }
+        }
+
+        private sealed class StubFleetDataHandler : HttpMessageHandler
+        {
+            public Uri RequestUri { get; private set; } = new("about:blank");
+
+            public string Authorization { get; private set; } = string.Empty;
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                RequestUri = request.RequestUri;
+                Authorization = string.Join(",", request.Headers.GetValues("Authorization"));
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"success\":true,\"data\":[{\"vehicleNumber\":\"MH01AB1005\",\"manufacturer\":\"Tata\",\"model\":\"Signa\",\"year\":2018,\"fuelCapacity\":350,\"status\":\"Active\"}]}",
+                        Encoding.UTF8,
+                        "application/json")
+                });
             }
         }
     }

@@ -10,7 +10,7 @@ namespace AiService.Infrastructure.Services;
 public class AzureOpenAiAssistantService : IAiAssistantService
 {
     private const string SystemPrompt =
-        "You are Smart Fleet AI Assistant. Provide concise, operationally useful logistics and fleet-management insights. Do not invent data.";
+        "You are Smart Fleet AI Assistant. Provide concise, operationally useful logistics and fleet-management insights. Use verified FleetService context when supplied, answer specific vehicle questions directly from that data, and never claim you lack access when context is present. If context says a vehicle was not found, say so; do not invent specifications.";
 
     private readonly HttpClient _httpClient;
 
