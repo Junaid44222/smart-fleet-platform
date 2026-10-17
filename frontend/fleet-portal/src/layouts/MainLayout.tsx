@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   AppBar,
   Drawer,
@@ -18,10 +19,17 @@ import {
   Badge,
   IconButton,
   Container,
+  CircularProgress,
+  Divider,
   InputBase,
   Chip,
+  Paper,
+  Popover,
+  Popper,
+  Tooltip,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import {
   Dashboard as DashboardIcon,
   DirectionsCar as VehiclesIcon,
@@ -38,7 +46,12 @@ import {
   Menu as MenuIcon,
   Close as CloseIcon,
   Search as SearchIcon,
+  WarningAmber,
 } from '@mui/icons-material';
+import { fetchDashboardStats, fetchDrivers, fetchVehicles } from '../api/fleetApi';
+import type { DashboardOverview, Driver, Vehicle } from '../api/types';
+import { setAuthToken } from '../api/apiClient';
+import { logout } from '../features/auth/authSlice';
 
 interface NavItem {
   label: string;
@@ -65,6 +78,13 @@ interface MainLayoutProps {
   userInitials?: string;
 }
 
+interface SearchResult {
+  label: string;
+  detail: string;
+  path: string;
+  kind: 'vehicle' | 'driver';
+}
+
 const sidebarBackground = '#0f172a';
 const sidebarText = '#cbd5e1';
 const sidebarActiveText = '#ffffff';
@@ -76,10 +96,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchAnchorEl, setSearchAnchorEl] = useState<HTMLDivElement | null>(null);
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<HTMLElement | null>(null);
+  const [notificationsData, setNotificationsData] = useState<DashboardOverview | null>(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState('');
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -92,9 +122,80 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUserName');
+    localStorage.removeItem('authUserRole');
+    setAuthToken(null);
+    dispatch(logout());
     handleMenuClose();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
+
+  const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) {
+      setSearchResults(null);
+      setSearchError('');
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError('');
+    setSearchResults(null);
+
+    try {
+      const [vehicles, drivers] = await Promise.all([fetchVehicles(), fetchDrivers()]);
+      const vehicleResults: SearchResult[] = vehicles
+        .filter((vehicle: Vehicle) =>
+          [vehicle.vehicleNumber, vehicle.manufacturer, vehicle.model, String(vehicle.year)]
+            .some((value) => value.toLocaleLowerCase().includes(query)))
+        .map((vehicle) => ({
+          label: vehicle.vehicleNumber,
+          detail: `${vehicle.manufacturer} ${vehicle.model} · ${vehicle.year}`,
+          path: `/vehicles/${vehicle.id}`,
+          kind: 'vehicle',
+        }));
+      const driverResults: SearchResult[] = drivers
+        .filter((driver: Driver) =>
+          [driver.firstName, driver.lastName, driver.employeeCode, driver.email]
+            .some((value) => value.toLocaleLowerCase().includes(query)))
+        .map((driver) => ({
+          label: `${driver.firstName} ${driver.lastName}`,
+          detail: `${driver.employeeCode} · ${driver.email}`,
+          path: `/drivers/${driver.id}`,
+          kind: 'driver',
+        }));
+
+      setSearchResults([...vehicleResults, ...driverResults].slice(0, 8));
+    } catch {
+      setSearchError('Unable to search fleet records. Check your connection and try again.');
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleNotificationsOpen = async (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationsAnchorEl(event.currentTarget);
+    setNotificationsError('');
+    setNotificationsLoading(true);
+    try {
+      setNotificationsData(await fetchDashboardStats());
+    } catch {
+      setNotificationsError('Unable to load current fleet alerts.');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const maintenanceDueCount = notificationsData?.stats.maintenanceDueCount ?? 0;
+  const safetyScore = notificationsData?.stats.safetyScore ?? 100;
+  const notificationCount = maintenanceDueCount + (safetyScore < 80 ? 1 : 0);
+
+  useEffect(() => {
+    void fetchDashboardStats()
+      .then(setNotificationsData)
+      .catch(() => undefined);
+  }, []);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -223,6 +324,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 </IconButton>
               )}
               <Box
+                ref={setSearchAnchorEl}
+                component="form"
+                role="search"
+                onSubmit={handleSearch}
                 sx={{
                   display: { xs: 'none', md: 'flex' },
                   alignItems: 'center',
@@ -237,16 +342,101 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 }}
               >
                 <SearchIcon sx={{ color: '#64748b', fontSize: 20 }} />
-                <InputBase placeholder="Search fleet, drivers, vehicles..." sx={{ flex: 1, fontSize: '14px' }} />
+                <InputBase
+                  placeholder="Search fleet, drivers, vehicles..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  inputProps={{ 'aria-label': 'Search fleet, drivers, vehicles' }}
+                  sx={{ flex: 1, fontSize: '14px' }}
+                />
+                <Tooltip title="Search">
+                  <span>
+                    <IconButton type="submit" size="small" aria-label="Search" disabled={searchLoading || !searchQuery.trim()}>
+                      {searchLoading ? <CircularProgress size={18} /> : <SearchIcon fontSize="small" />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Box>
+              <Popper
+                open={searchLoading || Boolean(searchError) || searchResults !== null}
+                anchorEl={searchAnchorEl}
+                placement="bottom-start"
+                sx={{ zIndex: 1300, width: { md: 420 }, maxWidth: 'calc(100vw - 32px)' }}
+              >
+                <Paper elevation={8} sx={{ mt: 1, maxHeight: 360, overflowY: 'auto' }}>
+                  {searchLoading && <Box sx={{ p: 2 }}><CircularProgress size={20} /></Box>}
+                  {searchError && <Alert severity="error" sx={{ m: 1 }}>{searchError}</Alert>}
+                  {!searchLoading && !searchError && searchResults?.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                      No matching vehicles or drivers.
+                    </Typography>
+                  )}
+                  {!searchLoading && searchResults?.map((result) => (
+                    <ListItemButton
+                      key={`${result.kind}-${result.path}`}
+                      onClick={() => {
+                        navigate(result.path);
+                        setSearchResults(null);
+                        setSearchQuery('');
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {result.kind === 'vehicle' ? <VehiclesIcon fontSize="small" /> : <DriversIcon fontSize="small" />}
+                      </ListItemIcon>
+                      <ListItemText primary={result.label} secondary={result.detail} />
+                    </ListItemButton>
+                  ))}
+                </Paper>
+              </Popper>
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton sx={{ color: 'text.secondary' }}>
-                <Badge badgeContent={2} color="error">
+              <Tooltip title="Notifications">
+              <IconButton aria-label="Notifications" onClick={handleNotificationsOpen} sx={{ color: 'text.secondary' }}>
+                <Badge badgeContent={notificationCount} color="error" showZero={false}>
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
+              </Tooltip>
+
+              <Popover
+                open={Boolean(notificationsAnchorEl)}
+                anchorEl={notificationsAnchorEl}
+                onClose={() => setNotificationsAnchorEl(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              >
+                <Box sx={{ width: 340, maxWidth: 'calc(100vw - 32px)' }}>
+                  <Typography variant="h6" sx={{ px: 2, py: 1.5 }}>Fleet alerts</Typography>
+                  <Divider />
+                  {notificationsLoading && <Box sx={{ display: 'grid', placeItems: 'center', p: 3 }}><CircularProgress size={24} /></Box>}
+                  {notificationsError && <Alert severity="error" sx={{ m: 2 }}>{notificationsError}</Alert>}
+                  {!notificationsLoading && !notificationsError && maintenanceDueCount === 0 && safetyScore >= 80 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2.5 }}>
+                      No active fleet alerts.
+                    </Typography>
+                  )}
+                  {!notificationsLoading && !notificationsError && maintenanceDueCount > 0 && (
+                    <List disablePadding>
+                      <ListItemButton onClick={() => { navigate('/maintenance'); setNotificationsAnchorEl(null); }}>
+                        <ListItemIcon><MaintenanceIcon color="warning" /></ListItemIcon>
+                        <ListItemText
+                          primary={`${maintenanceDueCount} maintenance item${maintenanceDueCount === 1 ? '' : 's'} due`}
+                          secondary="Due within the next 30 days"
+                        />
+                      </ListItemButton>
+                    </List>
+                  )}
+                  {!notificationsLoading && !notificationsError && safetyScore < 80 && (
+                    <List disablePadding>
+                      <ListItemButton onClick={() => { navigate('/dashboard'); setNotificationsAnchorEl(null); }}>
+                        <ListItemIcon><WarningAmber color="error" /></ListItemIcon>
+                        <ListItemText primary="Fleet safety score needs attention" secondary={`Current score: ${safetyScore}/100`} />
+                      </ListItemButton>
+                    </List>
+                  )}
+                </Box>
+              </Popover>
 
               <IconButton onClick={handleMenuOpen} sx={{ p: 0.5 }}>
                 <Avatar sx={{ width: 36, height: 36, backgroundColor: 'primary.main', fontSize: '14px' }}>

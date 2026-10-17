@@ -168,6 +168,13 @@ Notes:
 - `npm.cmd run build` and `npm.cmd run lint` passed. The production build reports the existing large JavaScript chunk advisory.
 - Live AI generation is verified with Ollama; Azure OpenAI remains unverified until its endpoint, API key, and deployment settings are configured.
 
+### Header Controls Pass (2026-10-18)
+
+- Global search now queries vehicle and driver records and opens the selected detail page.
+- Notifications now load current maintenance and low-safety alerts from dashboard data instead of showing a hard-coded badge.
+- Logout now clears persisted credentials, the Axios authorization header, and Redux auth state; protected routes redirect to login afterward.
+- Browser-verified search for `MH01AB1005`, maintenance alert loading, and logout/protected-route redirect. `npm.cmd run lint` and `npm.cmd run build` passed; the existing large-bundle advisory remains.
+
 ### Local Ollama Provider (2026-10-18)
 
 - Added provider selection with Ollama and Azure OpenAI support; development settings select Ollama at `http://localhost:11434/v1` using model `qwen3:0.6b`.
