@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Alert,
   Paper,
   TextField,
   Typography,
@@ -16,6 +17,7 @@ import {
   TrendingUp,
   WarningAmber,
 } from '@mui/icons-material';
+import { isAxiosError } from 'axios';
 import PageHeader from '../../../components/PageHeader';
 import { askAiAssistant } from '../../../api/aiApi';
 
@@ -46,6 +48,7 @@ const prompts = [
 const AIAssistantPage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ severity: 'warning' | 'error'; message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -55,12 +58,27 @@ const AIAssistantPage: React.FC = () => {
 
     setIsLoading(true);
     setResponse(null);
+    setNotice(null);
 
     try {
       const result = await askAiAssistant({ message: prompt.trim() });
-      setResponse(result.data ?? 'No response received from the AI assistant.');
-    } catch {
-      setResponse('Unable to reach the AI assistant. Please try again later.');
+      if (!result.success) {
+        setNotice({
+          severity: 'warning',
+          message: result.message || 'The AI assistant could not generate a response.',
+        });
+        return;
+      }
+
+      setResponse(result.data || result.message || 'No response received from the AI assistant.');
+    } catch (error) {
+      const serverMessage = isAxiosError<{ message?: string; title?: string }>(error)
+        ? error.response?.data?.message ?? error.response?.data?.title
+        : undefined;
+      setNotice({
+        severity: 'error',
+        message: serverMessage || 'Unable to reach the AI assistant. Please try again later.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +105,7 @@ const AIAssistantPage: React.FC = () => {
                 Use conversational prompts to accelerate planning and uncover operational issues.
               </Typography>
             </Box>
-            <Chip icon={<AutoAwesome />} label="Live insights ready" color="primary" />
+            <Chip icon={<AutoAwesome />} label="AI assistant" color="primary" />
           </Box>
 
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: '#f8fafc' }}>
@@ -120,6 +138,10 @@ const AIAssistantPage: React.FC = () => {
               ))}
             </Box>
           </Paper>
+
+          {notice && (
+            <Alert severity={notice.severity}>{notice.message}</Alert>
+          )}
 
           {response && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: '#ffffff' }}>
