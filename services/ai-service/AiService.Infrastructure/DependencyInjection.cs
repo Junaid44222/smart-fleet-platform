@@ -14,8 +14,11 @@ public static class DependencyInjection
     {
         services.Configure<AzureOpenAiOptions>(
             configuration.GetSection(AzureOpenAiOptions.SectionName));
+        services.Configure<AiProviderOptions>(
+            configuration.GetSection(AiProviderOptions.SectionName));
 
-        services.AddHttpClient<IAiAssistantService, AzureOpenAiAssistantService>();
+        services.AddHttpClient<IAiAssistantService, AzureOpenAiAssistantService>(
+            client => client.Timeout = TimeSpan.FromMinutes(3));
 
         return services;
     }

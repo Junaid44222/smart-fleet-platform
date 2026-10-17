@@ -11,6 +11,26 @@ This guide provides step-by-step instructions for testing the Smart Fleet Platfo
 - Node.js and npm
 - All services started via `run-all.ps1`
 
+### Local AI Assistant Setup
+
+Development uses Ollama by default and does not require Azure credentials. Install Ollama, ensure its local service is running on port 11434, then download the configured model:
+
+```powershell
+ollama pull qwen3:0.6b
+ollama list
+```
+
+The AI service development settings use `http://localhost:11434/v1` and model `qwen3:0.6b`. Restart the AI service after configuration changes. If Ollama is already running, do not start a second `ollama serve` process.
+
+To use Azure OpenAI instead, set these environment variables before starting the AI service; keep the key out of source control:
+
+```powershell
+$env:AI__Provider = 'AzureOpenAI'
+$env:AzureOpenAI__Endpoint = '<your-endpoint>'
+$env:AzureOpenAI__ApiKey = '<your-api-key>'
+$env:AzureOpenAI__DeploymentName = '<your-deployment>'
+```
+
 ## Test Execution Steps
 
 ### 1. Start All Services
@@ -299,6 +319,13 @@ curl -X GET http://localhost:5000/fleet/drivers \
 - Re-login to get a fresh token
 - Check JWT secret in Identity Service configuration
 - Verify all services are synchronized on time
+
+### Issue: AI Assistant cannot connect to its local model
+
+**Solution:**
+- Confirm Ollama is running on port 11434 with `ollama list`
+- Download the configured model with `ollama pull qwen3:0.6b`
+- Restart AIService so it loads the development provider settings
 
 ---
 

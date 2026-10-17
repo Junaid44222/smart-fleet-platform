@@ -16,12 +16,16 @@ public class AzureOpenAiAssistantService : IAiAssistantService
 
     private readonly AzureOpenAiOptions _options;
 
+    private readonly AiProviderOptions _providerOptions;
+
     public AzureOpenAiAssistantService(
         HttpClient httpClient,
-        IOptions<AzureOpenAiOptions> options)
+        IOptions<AzureOpenAiOptions> options,
+        IOptions<AiProviderOptions> providerOptions)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _providerOptions = providerOptions.Value;
     }
 
     public async Task<AiResponseDto> AskAsync(
@@ -108,17 +112,28 @@ public class AzureOpenAiAssistantService : IAiAssistantService
         string userPrompt,
         CancellationToken cancellationToken)
     {
-        ValidateConfiguration();
-
-        var requestUri =
-            $"{_options.Endpoint.TrimEnd('/')}/openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
+        var useOllama = _providerOptions.Provider.Equals(
+            "Ollama",
+            StringComparison.OrdinalIgnoreCase);
+        var requestUri = useOllama
+            ? GetOllamaRequestUri()
+            : GetAzureOpenAiRequestUri();
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
 
-        request.Headers.Add("api-key", _options.ApiKey);
+        if (useOllama)
+        {
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "ollama");
+        }
+        else
+        {
+            request.Headers.Add("api-key", _options.ApiKey);
+        }
 
         request.Content = JsonContent.Create(new AzureOpenAiChatRequest
         {
+            Model = useOllama ? _providerOptions.Model : null,
             Messages =
             [
                 new AzureOpenAiMessage("system", SystemPrompt),
@@ -141,8 +156,28 @@ public class AzureOpenAiAssistantService : IAiAssistantService
             ?? string.Empty;
     }
 
-    private void ValidateConfiguration()
+    private string GetOllamaRequestUri()
     {
+        if (string.IsNullOrWhiteSpace(_providerOptions.Endpoint) ||
+            string.IsNullOrWhiteSpace(_providerOptions.Model))
+        {
+            throw new InvalidOperationException(
+                "Ollama configuration is missing. Configure AI:Endpoint and AI:Model.");
+        }
+
+        return $"{_providerOptions.Endpoint.TrimEnd('/')}/chat/completions";
+    }
+
+    private string GetAzureOpenAiRequestUri()
+    {
+        if (!_providerOptions.Provider.Equals(
+                "AzureOpenAI",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported AI provider '{_providerOptions.Provider}'. Supported providers are Ollama and AzureOpenAI.");
+        }
+
         if (string.IsNullOrWhiteSpace(_options.Endpoint) ||
             string.IsNullOrWhiteSpace(_options.ApiKey) ||
             string.IsNullOrWhiteSpace(_options.DeploymentName))
@@ -150,10 +185,16 @@ public class AzureOpenAiAssistantService : IAiAssistantService
             throw new InvalidOperationException(
                 "Azure OpenAI configuration is missing. Configure AzureOpenAI:Endpoint, AzureOpenAI:ApiKey, and AzureOpenAI:DeploymentName.");
         }
+
+        return $"{_options.Endpoint.TrimEnd('/')}/openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
     }
 
     private sealed class AzureOpenAiChatRequest
     {
+        [JsonPropertyName("model")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Model { get; init; }
+
         [JsonPropertyName("messages")]
         public IReadOnlyCollection<AzureOpenAiMessage> Messages { get; init; } =
             Array.Empty<AzureOpenAiMessage>();
