@@ -175,6 +175,12 @@ Notes:
 - Logout now clears persisted credentials, the Axios authorization header, and Redux auth state; protected routes redirect to login afterward.
 - Browser-verified search for `MH01AB1005`, maintenance alert loading, and logout/protected-route redirect. `npm.cmd run lint` and `npm.cmd run build` passed; the existing large-bundle advisory remains.
 
+### Responsive Layout Pass (2026-10-18)
+
+- Removed starter CSS that fixed `#root` at 1126px and centered inherited text, which caused the app to feel offset and overflow narrow browser widths.
+- Verified root width and body scroll width match at 390px and 1440px; the application root begins at x=0 at both sizes.
+- Frontend production build passes.
+
 ### Local Ollama Provider (2026-10-18)
 
 - Added provider selection with Ollama and Azure OpenAI support; development settings select Ollama at `http://localhost:11434/v1` using model `qwen3:0.6b`.
