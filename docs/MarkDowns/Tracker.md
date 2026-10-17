@@ -2,7 +2,7 @@
 
 # Smart Fleet Platform - Development Tracker
 
-Last Updated: 2026-08-15
+Last Updated: 2026-10-18
 
 Project Status: In Progress
 
@@ -143,7 +143,16 @@ Notes:
 - Test Report: See docs/MarkDowns/IntegrationTestingReport.md
 - Route Configuration: See gateway/ApiGateway/ocelot.json (UPDATED 2026-07-06)
 - Direct service access works (FleetService, IdentityService responding)
-- **BLOCKING ISSUE:** API Gateway must be fixed before auth flow can be tested
+- **Current AI blocker:** Azure OpenAI endpoint, API key, and deployment are not configured; AI health checks work, but chat and fleet-health generation require credentials.
+
+### AI Configuration Regression Coverage (2026-10-18)
+
+- Added unit tests for chat and fleet-health requests when Azure OpenAI configuration is missing; both return a structured failure rather than an unhandled exception.
+- `dotnet test services/ai-service/AiService.Tests/AiService.Tests.csproj --no-restore -p:BaseOutputPath="$env:TEMP\smartfleet-ai-test\"` passed: 3 tests, 0 failures.
+- `dotnet build services/ai-service/AiService.API/AiService.API.csproj --no-restore` passed using an isolated temp output path to avoid the active service's locked binaries.
+- Ran the isolated API on port 5092; `POST /api/AiAssistant/chat` returned HTTP 200 with `success: false` and the missing-configuration message. The temporary instance was stopped after the check.
+- A second `ApiGateway` process cannot start on port 5000 while the existing gateway owns that port. This is an expected address-in-use condition; the existing gateway remains available and its routes should be tested rather than launching a duplicate.
+- Next: continue integration checks for endpoints that do not require Azure credentials; AI generation remains blocked until Azure OpenAI settings are supplied.
 
 ---
 
