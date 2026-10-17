@@ -154,6 +154,12 @@ Notes:
 - A second `ApiGateway` process cannot start on port 5000 while the existing gateway owns that port. This is an expected address-in-use condition; the existing gateway remains available and its routes should be tested rather than launching a duplicate.
 - Next: continue integration checks for endpoints that do not require Azure credentials; AI generation remains blocked until Azure OpenAI settings are supplied.
 
+### Local E2E Integration Pass (2026-10-18)
+
+- `scripts/e2e/run-e2e.ps1` passed all required checks: AI gateway health (`/ai/health`, HTTP 200), direct AI health (`/health`, HTTP 200), and authenticated fleet vehicles (`/fleet/Vehicles`, HTTP 200).
+- The smoke script auto-registered an E2E identity because no credentials were configured; the script does not currently clean up that account.
+- Next: validate the frontend sign-in flow against the verified gateway-backed identity and fleet routes.
+
 ---
 
 # Completed Tasks
