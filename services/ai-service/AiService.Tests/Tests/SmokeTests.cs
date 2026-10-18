@@ -4,6 +4,7 @@ using AiService.Infrastructure.Options;
 using AiService.Infrastructure.Services;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -138,6 +139,71 @@ namespace AiService.Tests
             Assert.Equal("/fleet/Vehicles", handler.RequestUri.AbsolutePath);
         }
 
+        [Fact]
+        public async Task FleetVehicleContextProvider_IncludesOnlyMatchingMaintenanceRecords()
+        {
+            var handler = new StubFleetDataHandler();
+            using var httpClient = new HttpClient(handler)
+            {
+                BaseAddress = new Uri("http://localhost:5000/")
+            };
+            var provider = new FleetVehicleContextProvider(httpClient);
+
+            var context = await provider.GetVehicleContextAsync(
+                "Show maintenance history for MH01AB1005",
+                "Bearer test-token",
+                CancellationToken.None);
+
+            Assert.Contains("Brake Inspection", context);
+            Assert.Contains("Brake pads replaced", context);
+            Assert.DoesNotContain("Other vehicle private record", context);
+            Assert.Equal(
+                new[] { "/fleet/Vehicles", "/fleet/MaintenanceRecords" },
+                handler.RequestPaths);
+        }
+
+        [Fact]
+        public async Task FleetVehicleContextProvider_IncludesOnlyMatchingFuelRecords()
+        {
+            var handler = new StubFleetDataHandler();
+            using var httpClient = new HttpClient(handler)
+            {
+                BaseAddress = new Uri("http://localhost:5000/")
+            };
+            var provider = new FleetVehicleContextProvider(httpClient);
+
+            var context = await provider.GetVehicleContextAsync(
+                "Show fuel consumption history for MH01AB1005",
+                "Bearer test-token",
+                CancellationToken.None);
+
+            Assert.Contains("quantity 42.5 litres", context);
+            Assert.DoesNotContain("Other vehicle private fuel record", context);
+            Assert.Equal(
+                new[] { "/fleet/Vehicles", "/fleet/FuelRecords" },
+                handler.RequestPaths);
+        }
+
+        [Fact]
+        public async Task FleetVehicleContextProvider_DoesNotGuess_WhenRegistrationIsUnknown()
+        {
+            var handler = new StubFleetDataHandler();
+            using var httpClient = new HttpClient(handler)
+            {
+                BaseAddress = new Uri("http://localhost:5000/")
+            };
+            var provider = new FleetVehicleContextProvider(httpClient);
+
+            var context = await provider.GetVehicleContextAsync(
+                "What is the fuel capacity of MH99ZZ9999?",
+                "Bearer test-token",
+                CancellationToken.None);
+
+            Assert.Contains("no vehicle registered as MH99ZZ9999", context);
+            Assert.DoesNotContain("fuel capacity", context);
+            Assert.Equal(new[] { "/fleet/Vehicles" }, handler.RequestPaths);
+        }
+
         private sealed class StubMessageHandler : HttpMessageHandler
         {
             public Uri RequestUri { get; private set; } = new("about:blank");
@@ -175,17 +241,34 @@ namespace AiService.Tests
 
             public string Authorization { get; private set; } = string.Empty;
 
+            public List<string> RequestPaths { get; } = [];
+
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken)
             {
                 RequestUri = request.RequestUri;
                 Authorization = string.Join(",", request.Headers.GetValues("Authorization"));
+                RequestPaths.Add(RequestUri.AbsolutePath);
+
+                var responseBody = RequestUri.AbsolutePath switch
+                {
+                    "/fleet/Vehicles" => "{\"success\":true,\"data\":[{" +
+                        "\"id\":\"vehicle-1\",\"vehicleNumber\":\"MH01AB1005\",\"manufacturer\":\"Tata\",\"model\":\"Signa\",\"year\":2018,\"fuelCapacity\":350,\"status\":\"Active\"},{" +
+                        "\"id\":\"vehicle-2\",\"vehicleNumber\":\"MH01AB1006\",\"manufacturer\":\"Volvo\",\"model\":\"FMX\",\"year\":2022,\"fuelCapacity\":400,\"status\":\"Active\"}]}",
+                    "/fleet/MaintenanceRecords" => "{\"success\":true,\"data\":[{" +
+                        "\"vehicleId\":\"vehicle-1\",\"serviceType\":\"Brake Inspection\",\"description\":\"Brake pads replaced\",\"scheduledDate\":\"2026-08-12T00:00:00Z\",\"completedDate\":\"2026-08-12T00:00:00Z\",\"cost\":1400,\"vendor\":\"FleetWorks\",\"status\":\"Completed\",\"isDeleted\":false},{" +
+                        "\"vehicleId\":\"vehicle-2\",\"serviceType\":\"Oil Change\",\"description\":\"Other vehicle private record\",\"scheduledDate\":\"2026-08-12T00:00:00Z\",\"cost\":900,\"vendor\":\"FleetWorks\",\"status\":\"Completed\",\"isDeleted\":false}]}",
+                    "/fleet/FuelRecords" => "{\"success\":true,\"data\":[{" +
+                        "\"vehicleId\":\"vehicle-1\",\"fuelDate\":\"2026-10-10T00:00:00Z\",\"quantity\":42.5,\"cost\":5200,\"odometerReading\":102500,\"isDeleted\":false},{" +
+                        "\"vehicleId\":\"vehicle-2\",\"fuelDate\":\"2026-10-10T00:00:00Z\",\"quantity\":60,\"cost\":7000,\"odometerReading\":220000,\"isDeleted\":false}]}",
+                    _ => "{\"success\":true,\"data\":[]}"
+                };
 
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
-                        "{\"success\":true,\"data\":[{\"vehicleNumber\":\"MH01AB1005\",\"manufacturer\":\"Tata\",\"model\":\"Signa\",\"year\":2018,\"fuelCapacity\":350,\"status\":\"Active\"}]}",
+                        responseBody,
                         Encoding.UTF8,
                         "application/json")
                 });

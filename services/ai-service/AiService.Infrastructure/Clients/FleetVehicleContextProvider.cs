@@ -43,14 +43,10 @@ public sealed class FleetVehicleContextProvider : IFleetVehicleContextProvider
             @"\s+",
             string.Empty).ToUpperInvariant();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "fleet/Vehicles");
-        request.Headers.TryAddWithoutValidation("Authorization", authorizationHeader);
-
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var fleetResponse = await response.Content.ReadFromJsonAsync<
-            FleetApiResponse<List<FleetVehicle>>>(JsonOptions, cancellationToken);
+        var fleetResponse = await GetFleetDataAsync<List<FleetVehicle>>(
+            "fleet/Vehicles",
+            authorizationHeader,
+            cancellationToken);
 
         var vehicle = fleetResponse?.Data?.FirstOrDefault(candidate =>
             string.Equals(
@@ -64,11 +60,110 @@ public sealed class FleetVehicleContextProvider : IFleetVehicleContextProvider
                    "Tell the user that no matching vehicle was found; do not guess its specifications.";
         }
 
-        return $"Verified FleetService record for {vehicle.VehicleNumber}: " +
+        var context = $"Verified FleetService record for {vehicle.VehicleNumber}: " +
                $"manufacturer {vehicle.Manufacturer}, model {vehicle.Model}, " +
                $"year {vehicle.Year}, fuel capacity {vehicle.FuelCapacity} litres, " +
                $"status {vehicle.Status}. Use these verified values to answer the user's question directly.";
+
+        if (AsksAboutMaintenance(question))
+        {
+            context += " " + await GetMaintenanceContextAsync(
+                vehicle,
+                authorizationHeader,
+                cancellationToken);
+        }
+
+        if (AsksAboutFuelRecords(question))
+        {
+            context += " " + await GetFuelContextAsync(
+                vehicle,
+                authorizationHeader,
+                cancellationToken);
+        }
+
+        return context;
     }
+
+    private async Task<string> GetMaintenanceContextAsync(
+        FleetVehicle vehicle,
+        string authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        var response = await GetFleetDataAsync<List<MaintenanceRecord>>(
+            "fleet/MaintenanceRecords",
+            authorizationHeader,
+            cancellationToken);
+        var records = response?.Data?
+            .Where(record => !record.IsDeleted &&
+                string.Equals(record.VehicleId, vehicle.Id, StringComparison.OrdinalIgnoreCase))
+            .ToArray() ?? [];
+
+        if (records.Length == 0)
+        {
+            return $"No maintenance records are registered for {vehicle.VehicleNumber}. " +
+                   "Tell the user no matching maintenance history was found.";
+        }
+
+        return $"Maintenance records for {vehicle.VehicleNumber}: " +
+               string.Join("; ", records.Select(record =>
+                   $"{record.ServiceType}: {record.Description}, status {record.Status}, " +
+                   $"scheduled {record.ScheduledDate}, completed {record.CompletedDate ?? "not completed"}, " +
+                   $"cost {record.Cost} from {record.Vendor}")) + ". Use these records to answer directly.";
+    }
+
+    private async Task<string> GetFuelContextAsync(
+        FleetVehicle vehicle,
+        string authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        var response = await GetFleetDataAsync<List<FuelRecord>>(
+            "fleet/FuelRecords",
+            authorizationHeader,
+            cancellationToken);
+        var records = response?.Data?
+            .Where(record => !record.IsDeleted &&
+                string.Equals(record.VehicleId, vehicle.Id, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(record => record.FuelDate)
+            .ToArray() ?? [];
+
+        if (records.Length == 0)
+        {
+            return $"No fuel records are registered for {vehicle.VehicleNumber}. " +
+                   "Tell the user no matching fuel history was found.";
+        }
+
+        return $"Fuel records for {vehicle.VehicleNumber}: " +
+               string.Join("; ", records.Select(record =>
+                   $"date {record.FuelDate}, quantity {record.Quantity} litres, " +
+                   $"cost {record.Cost}, odometer {record.OdometerReading}")) + ". Use these records to answer directly.";
+    }
+
+    private async Task<FleetApiResponse<T>?> GetFleetDataAsync<T>(
+        string path,
+        string authorizationHeader,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.TryAddWithoutValidation("Authorization", authorizationHeader);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<FleetApiResponse<T>>(
+            JsonOptions,
+            cancellationToken);
+    }
+
+    private static bool AsksAboutMaintenance(string question) =>
+        ContainsAny(question, "maintenance", "service history", "service record", "repair", "inspection");
+
+    private static bool AsksAboutFuelRecords(string question) =>
+        ContainsAny(question, "fuel history", "fuel record", "fuel usage", "fuel consumption", "fuel spend", "fuel cost", "refuel", "refill") ||
+        question.Contains("fuel", StringComparison.OrdinalIgnoreCase) &&
+        !question.Contains("capacity", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
 
     private sealed class FleetApiResponse<T>
     {
@@ -79,6 +174,8 @@ public sealed class FleetVehicleContextProvider : IFleetVehicleContextProvider
 
     private sealed class FleetVehicle
     {
+        public string Id { get; init; } = string.Empty;
+
         public string VehicleNumber { get; init; } = string.Empty;
 
         public string Manufacturer { get; init; } = string.Empty;
@@ -90,5 +187,41 @@ public sealed class FleetVehicleContextProvider : IFleetVehicleContextProvider
         public decimal FuelCapacity { get; init; }
 
         public string Status { get; init; } = string.Empty;
+    }
+
+    private sealed class MaintenanceRecord
+    {
+        public string VehicleId { get; init; } = string.Empty;
+
+        public string ServiceType { get; init; } = string.Empty;
+
+        public string Description { get; init; } = string.Empty;
+
+        public string ScheduledDate { get; init; } = string.Empty;
+
+        public string? CompletedDate { get; init; }
+
+        public decimal Cost { get; init; }
+
+        public string Vendor { get; init; } = string.Empty;
+
+        public string Status { get; init; } = string.Empty;
+
+        public bool IsDeleted { get; init; }
+    }
+
+    private sealed class FuelRecord
+    {
+        public string VehicleId { get; init; } = string.Empty;
+
+        public string FuelDate { get; init; } = string.Empty;
+
+        public decimal Quantity { get; init; }
+
+        public decimal Cost { get; init; }
+
+        public decimal OdometerReading { get; init; }
+
+        public bool IsDeleted { get; init; }
     }
 }
