@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using IdentityService.API.Data;
+using IdentityService.API.Authorization;
 using IdentityService.API.DTOs;
 using IdentityService.API.Models;
 using IdentityService.API.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,7 +54,7 @@ public class AuthController : ControllerBase
             Id = Guid.NewGuid(),
             FullName = request.FullName,
             Email = request.Email,
-            Role = request.Role
+            Role = UserRoles.Dispatcher
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
@@ -64,7 +66,8 @@ public class AuthController : ControllerBase
             new AuthResponseDto
             {
                 Success = true,
-                Message = "User registered successfully"
+                Message = "User registered successfully",
+                Role = user.Role
             });
     }
 
@@ -110,8 +113,81 @@ public class AuthController : ControllerBase
             {
                 Success = true,
                 Token = token,
-                Message = "Login successful"
+                Message = "Login successful",
+                Role = user.Role,
+                FullName = user.FullName
             });
+    }
+
+    [HttpGet("users")]
+    [Authorize(Roles = UserRoles.Administrators)]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = await _context.Users
+            .OrderBy(user => user.FullName)
+            .Select(user => new UserSummaryDto
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = user.Role
+            })
+            .ToListAsync();
+
+        return Ok(new AuthResponseDto
+        {
+            Success = true,
+            Message = "Users fetched successfully",
+            Data = users
+        });
+    }
+
+    [HttpPut("users/{id:guid}/role")]
+    [Authorize(Roles = UserRoles.Administrators)]
+    public async Task<IActionResult> UpdateUserRole(
+        Guid id,
+        UpdateUserRoleRequestDto request)
+    {
+        if (Guid.TryParse(User.FindFirst("UserId")?.Value, out var actingUserId) &&
+            actingUserId == id)
+        {
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "Administrators cannot change their own role."
+            });
+        }
+
+        var role = UserRoles.AssignableRoles.FirstOrDefault(candidate =>
+            string.Equals(candidate, request.Role, StringComparison.OrdinalIgnoreCase));
+        if (role is null)
+        {
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "The requested role is not assignable."
+            });
+        }
+
+        var user = await _context.Users.FindAsync(id);
+        if (user is null)
+        {
+            return NotFound(new AuthResponseDto
+            {
+                Success = false,
+                Message = "User not found."
+            });
+        }
+
+        user.Role = role;
+        await _context.SaveChangesAsync();
+
+        return Ok(new AuthResponseDto
+        {
+            Success = true,
+            Message = "User role updated successfully.",
+            Role = user.Role
+        });
     }
 
     private bool VerifyPassword(

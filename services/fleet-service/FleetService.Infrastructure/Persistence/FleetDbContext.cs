@@ -14,6 +14,10 @@ public class FleetDbContext : DbContext
 
     public DbSet<Driver> Drivers => Set<Driver>();
 
+    public DbSet<VehicleAssignment> VehicleAssignments => Set<VehicleAssignment>();
+
+    public DbSet<Trip> Trips => Set<Trip>();
+
     public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
 
     public DbSet<FuelRecord> FuelRecords => Set<FuelRecord>();
@@ -78,6 +82,58 @@ public class FleetDbContext : DbContext
                   .IsUnique();
 
             entity.HasIndex(x => x.Status);
+        });
+
+        modelBuilder.Entity<VehicleAssignment>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany()
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithMany()
+                .HasForeignKey(x => x.DriverId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.VehicleId, x.AssignedDate });
+            entity.HasIndex(x => new { x.VehicleId, x.ReleasedDate })
+                .IsUnique()
+                .HasFilter("[ReleasedDate] IS NULL");
+            entity.HasIndex(x => new { x.DriverId, x.ReleasedDate })
+                .IsUnique()
+                .HasFilter("[ReleasedDate] IS NULL");
+        });
+
+        modelBuilder.Entity<Trip>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.TripNumber).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Source).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.Destination).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Distance).HasPrecision(18, 2);
+            entity.Property(x => x.FuelConsumed).HasPrecision(18, 2);
+            entity.Property(x => x.CreatedBy).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.UpdatedBy).HasMaxLength(100);
+
+            entity.HasOne(x => x.Vehicle)
+                .WithMany()
+                .HasForeignKey(x => x.VehicleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Driver)
+                .WithMany()
+                .HasForeignKey(x => x.DriverId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.TripNumber).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.StartDate });
+            entity.HasIndex(x => x.VehicleId);
+            entity.HasIndex(x => x.DriverId);
         });
 
         modelBuilder.Entity<MaintenanceRecord>(entity =>

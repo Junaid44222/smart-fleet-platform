@@ -1,0 +1,97 @@
+namespace FleetService.Domain.Entities;
+
+public class Trip
+{
+    public const string ScheduledStatus = "Scheduled";
+    public const string InProgressStatus = "InProgress";
+    public const string CompletedStatus = "Completed";
+    public const string CancelledStatus = "Cancelled";
+
+    public Guid Id { get; set; }
+
+    public string TripNumber { get; set; } = string.Empty;
+
+    public Guid VehicleId { get; set; }
+
+    public Guid DriverId { get; set; }
+
+    public string Source { get; set; } = string.Empty;
+
+    public string Destination { get; set; } = string.Empty;
+
+    public DateTime StartDate { get; set; }
+
+    public DateTime EndDate { get; set; }
+
+    public DateTime? ActualStartDate { get; private set; }
+
+    public DateTime? ActualEndDate { get; private set; }
+
+    public decimal? Distance { get; private set; }
+
+    public decimal? FuelConsumed { get; private set; }
+
+    public string Status { get; private set; } = ScheduledStatus;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public string CreatedBy { get; set; } = "system";
+
+    public DateTime? UpdatedAt { get; private set; }
+
+    public string? UpdatedBy { get; private set; }
+
+    public bool IsDeleted { get; set; }
+
+    public Vehicle? Vehicle { get; set; }
+
+    public Driver? Driver { get; set; }
+
+    public void Start(DateTime startedAt, string changedBy)
+    {
+        EnsureStatus(ScheduledStatus, "Only scheduled trips can be started.");
+        ActualStartDate = startedAt;
+        Status = InProgressStatus;
+        Touch(startedAt, changedBy);
+    }
+
+    public void Complete(DateTime completedAt, decimal distance, decimal fuelConsumed, string changedBy)
+    {
+        EnsureStatus(InProgressStatus, "Only in-progress trips can be completed.");
+        if (distance < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(distance), "Distance cannot be negative.");
+        }
+        if (fuelConsumed < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fuelConsumed), "Fuel consumed cannot be negative.");
+        }
+
+        ActualEndDate = completedAt;
+        Distance = distance;
+        FuelConsumed = fuelConsumed;
+        Status = CompletedStatus;
+        Touch(completedAt, changedBy);
+    }
+
+    public void Cancel(DateTime cancelledAt, string changedBy)
+    {
+        EnsureStatus(ScheduledStatus, "Only scheduled trips can be cancelled.");
+        Status = CancelledStatus;
+        Touch(cancelledAt, changedBy);
+    }
+
+    private void EnsureStatus(string expected, string message)
+    {
+        if (!string.Equals(Status, expected, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private void Touch(DateTime changedAt, string changedBy)
+    {
+        UpdatedAt = changedAt;
+        UpdatedBy = changedBy;
+    }
+}

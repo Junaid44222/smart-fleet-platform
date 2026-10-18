@@ -1,4 +1,5 @@
 using FleetService.Application.DTOs;
+using FleetService.API.Authorization;
 using FleetService.Application.Features.FuelRecords.Commands;
 using FleetService.Application.Features.FuelRecords.Queries;
 using FleetService.Application.Responses;
@@ -58,6 +59,7 @@ public class FuelRecordsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = FleetRoles.FleetManagers)]
     public async Task<IActionResult> Create(
         [FromBody] CreateFuelRecordDto dto)
     {
@@ -73,6 +75,7 @@ public class FuelRecordsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = FleetRoles.FleetManagers)]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateFuelRecordDto dto)
@@ -98,6 +101,7 @@ public class FuelRecordsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = FleetRoles.Administrators)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var deleted = await _mediator.Send(

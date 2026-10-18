@@ -9,6 +9,7 @@
     <Project Path="services/fleet-service/FleetService.Application/FleetService.Application.csproj" />
     <Project Path="services/fleet-service/FleetService.Domain/FleetService.Domain.csproj" />
     <Project Path="services/fleet-service/FleetService.Infrastructure/FleetService.Infrastructure.csproj" />
+    <Project Path="services/fleet-service/FleetService.Tests/FleetService.Tests.csproj" />
   </Folder>
   <Folder Name="/services/identity-service/">
     <Project Path="services/identity-service/IdentityService.API/IdentityService.API.csproj" />

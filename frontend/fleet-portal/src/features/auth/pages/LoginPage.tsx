@@ -19,18 +19,20 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      const response = await apiClient.post<ApiResponse<{ token?: string }>>('/identity/Auth/login', {
+      const response = await apiClient.post<ApiResponse<null>>('/identity/Auth/login', {
         email,
         password,
       });
 
       if (response.data.success && response.data.token) {
         const token = response.data.token;
+        const userName = response.data.fullName || email;
+        const userRole = response.data.role || 'Dispatcher';
         localStorage.setItem('authToken', token);
-        localStorage.setItem('authUserName', 'David');
-        localStorage.setItem('authUserRole', 'Admin');
+        localStorage.setItem('authUserName', userName);
+        localStorage.setItem('authUserRole', userRole);
         setAuthToken(token);
-        dispatch(login({ userName: 'David', userRole: 'Admin' }));
+        dispatch(login({ userName, userRole }));
         navigate('/dashboard');
       } else {
         setError(response.data.message ?? 'Invalid login attempt');

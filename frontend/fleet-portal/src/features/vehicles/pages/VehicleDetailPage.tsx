@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
+  Alert,
   Card,
   CardContent,
   Chip,
@@ -12,9 +13,11 @@ import {
   DialogContent,
   DialogActions,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
+  TextField,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
@@ -25,7 +28,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import PageHeader from '../../../components/PageHeader';
-import { fetchVehicleById, fetchDrivers } from '../../../api/fleetApi';
+import { changeVehicleStatus, fetchVehicleAssignment, fetchVehicleById, fetchDrivers, setVehicleAssignment } from '../../../api/fleetApi';
 import type { Driver, Vehicle } from '../../../api/types';
 
 const VehicleDetailPage: React.FC = () => {
@@ -34,8 +37,18 @@ const VehicleDetailPage: React.FC = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
   const [assignedDriver, setAssignedDriver] = useState<Driver | null>(null);
+  const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [assignmentMessage, setAssignmentMessage] = useState('');
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [statusReason, setStatusReason] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [savingStatus, setSavingStatus] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [error, setError] = useState('');
@@ -74,11 +87,21 @@ const VehicleDetailPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!id) return;
-    const stored = localStorage.getItem(`assignedDriver_${id}`);
-    if (stored) {
-      setAssignedDriverId(stored);
-    }
+    const loadAssignment = async () => {
+      if (!id) return;
+      setAssignmentLoading(true);
+      setAssignmentError('');
+      try {
+        const assignment = await fetchVehicleAssignment(id);
+        setAssignedDriverId(assignment?.driverId ?? null);
+      } catch {
+        setAssignmentError('Unable to load the current driver assignment.');
+      } finally {
+        setAssignmentLoading(false);
+      }
+    };
+
+    void loadAssignment();
   }, [id]);
 
   useEffect(() => {
@@ -90,6 +113,63 @@ const VehicleDetailPage: React.FC = () => {
   }, [assignedDriverId, drivers]);
 
   const navigate = useNavigate();
+  const canManageVehicleStatus = userRole === 'Admin';
+  const canAssignDriver = ['Admin', 'SuperAdmin', 'FleetManager', 'Dispatcher'].includes(userRole);
+
+  const handleAssignmentSave = async () => {
+    if (!id) return;
+    setAssignmentSaving(true);
+    setAssignmentError('');
+    setAssignmentMessage('');
+    try {
+      const assignment = await setVehicleAssignment(id, selectedDriverId || null);
+      setAssignedDriverId(assignment?.driverId ?? null);
+      setDrivers((currentDrivers) => currentDrivers.map((driver) => {
+        if (driver.id === assignedDriverId && driver.id !== assignment?.driverId) {
+          return { ...driver, status: 'Active' };
+        }
+        if (driver.id === assignment?.driverId) {
+          return { ...driver, status: 'Assigned' };
+        }
+        return driver;
+      }));
+      setAssignmentMessage(assignment
+        ? `Assigned ${assignment.driverName} to this vehicle.`
+        : 'Driver unassigned from this vehicle.');
+      setIsAssignOpen(false);
+    } catch (saveError) {
+      setAssignmentError(saveError instanceof Error ? saveError.message : 'Unable to save the driver assignment.');
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
+
+  const handleStatusDialogOpen = () => {
+    if (!vehicle) return;
+    setSelectedStatus(vehicle.status);
+    setStatusReason('');
+    setStatusError('');
+    setIsStatusDialogOpen(true);
+  };
+
+  const handleStatusSave = async () => {
+    if (!id || !vehicle) return;
+    setSavingStatus(true);
+    setStatusError('');
+    setStatusMessage('');
+    try {
+      const result = await changeVehicleStatus(id, selectedStatus, statusReason);
+      setVehicle(result.vehicle);
+      setStatusMessage(result.workOrder
+        ? `Vehicle placed into maintenance. Work order ${result.workOrder.id} created.`
+        : `Vehicle status changed to ${result.vehicle.status}.`);
+      setIsStatusDialogOpen(false);
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : 'Unable to change vehicle status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
 
   return (
     <Box>
@@ -106,17 +186,20 @@ const VehicleDetailPage: React.FC = () => {
         <Typography color="error">{error}</Typography>
       ) : vehicle ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {statusMessage && <Alert severity="success" onClose={() => setStatusMessage('')}>{statusMessage}</Alert>}
+          {assignmentMessage && <Alert severity="success" onClose={() => setAssignmentMessage('')}>{assignmentMessage}</Alert>}
+          {assignmentError && <Alert severity="error" onClose={() => setAssignmentError('')}>{assignmentError}</Alert>}
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', gap: 2 }}>
                 <Box>
                   <Typography variant="h6">Assigned Driver</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {assignedDriver ? `${assignedDriver.firstName} ${assignedDriver.lastName}` : 'No driver assigned to this vehicle.'}
+                    {assignmentLoading ? 'Loading assignment…' : assignedDriver ? `${assignedDriver.firstName} ${assignedDriver.lastName}` : 'No driver assigned to this vehicle.'}
                   </Typography>
                 </Box>
-                {userRole === 'Admin' && (
-                  <Button variant="contained" onClick={() => {
+                {canAssignDriver && (
+                  <Button variant="contained" disabled={assignmentLoading} onClick={() => {
                     setSelectedDriverId(assignedDriverId ?? '');
                     setIsAssignOpen(true);
                   }}>
@@ -142,7 +225,9 @@ const VehicleDetailPage: React.FC = () => {
                     onChange={(event: SelectChangeEvent<string>) => setSelectedDriverId(event.target.value)}
                   >
                     <MenuItem value="">Unassign</MenuItem>
-                    {drivers.map((driver) => (
+                    {drivers.filter((driver) =>
+                      driver.status.toLowerCase() === 'active' || driver.id === assignedDriverId
+                    ).map((driver) => (
                       <MenuItem key={driver.id} value={driver.id}>
                         {driver.firstName} {driver.lastName} • {driver.employeeCode}
                       </MenuItem>
@@ -152,27 +237,15 @@ const VehicleDetailPage: React.FC = () => {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setIsAssignOpen(false)} color="secondary">
+              <Button onClick={() => setIsAssignOpen(false)} color="secondary" disabled={assignmentSaving}>
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  if (id) {
-                    const value = selectedDriverId || '';
-                    if (value) {
-                      localStorage.setItem(`assignedDriver_${id}`, value);
-                      setAssignedDriverId(value);
-                    } else {
-                      localStorage.removeItem(`assignedDriver_${id}`);
-                      setAssignedDriverId(null);
-                    }
-                  }
-                  setIsAssignOpen(false);
-                }}
+                onClick={() => void handleAssignmentSave()}
                 variant="contained"
-                disabled={loadingDrivers}
+                disabled={loadingDrivers || assignmentSaving}
               >
-                Save
+                {assignmentSaving ? 'Saving…' : 'Save'}
               </Button>
             </DialogActions>
           </Dialog>
@@ -186,6 +259,11 @@ const VehicleDetailPage: React.FC = () => {
                   </Typography>
                 </Box>
                 <Chip label={vehicle.status} color={vehicle.status.toLowerCase() === 'active' ? 'success' : 'default'} />
+                {canManageVehicleStatus && (
+                  <Button variant="outlined" onClick={handleStatusDialogOpen}>
+                    Change Status
+                  </Button>
+                )}
               </Box>
               <Divider sx={{ my: 2 }} />
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
@@ -229,6 +307,56 @@ const VehicleDetailPage: React.FC = () => {
               </CardContent>
             </Card>
           </Box>
+          <Dialog
+            open={isStatusDialogOpen}
+            onClose={() => !savingStatus && setIsStatusDialogOpen(false)}
+            fullWidth
+            maxWidth="sm"
+          >
+            <DialogTitle>Change vehicle status</DialogTitle>
+            <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
+              {statusError && <Alert severity="error">{statusError}</Alert>}
+              <FormControl fullWidth>
+                <InputLabel id="vehicle-status-label">Status</InputLabel>
+                <Select
+                  labelId="vehicle-status-label"
+                  value={selectedStatus}
+                  label="Status"
+                  onChange={(event) => setSelectedStatus(event.target.value)}
+                >
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Inactive">Inactive</MenuItem>
+                  <MenuItem value="Maintenance">Maintenance</MenuItem>
+                </Select>
+              </FormControl>
+              {selectedStatus === 'Maintenance' && (
+                <TextField
+                  label="Incident / maintenance reason"
+                  value={statusReason}
+                  onChange={(event) => setStatusReason(event.target.value)}
+                  required
+                  multiline
+                  minRows={3}
+                  helperText="Saving creates an unplanned work order and removes the vehicle from service."
+                />
+              )}
+              {vehicle?.status === 'Maintenance' && selectedStatus === 'Active' && (
+                <FormHelperText>
+                  The vehicle cannot return to service until its unplanned maintenance work order is completed.
+                </FormHelperText>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setIsStatusDialogOpen(false)} disabled={savingStatus}>Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={() => void handleStatusSave()}
+                disabled={savingStatus || !selectedStatus || (selectedStatus === 'Maintenance' && !statusReason.trim())}
+              >
+                {savingStatus ? 'Saving…' : 'Save status'}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Box>
       ) : (
         <Typography>No vehicle found.</Typography>

@@ -1,4 +1,5 @@
 using FleetService.Application.DTOs;
+using FleetService.API.Authorization;
 using FleetService.Application.Features.Drivers.Commands;
 using FleetService.Application.Features.Drivers.Queries;
 using FleetService.Application.Responses;
@@ -58,6 +59,7 @@ public class DriversController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = FleetRoles.FleetManagers)]
     public async Task<IActionResult> Create(
         [FromBody] CreateDriverDto dto)
     {
@@ -73,6 +75,7 @@ public class DriversController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = FleetRoles.FleetManagers)]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateDriverDto dto)
@@ -98,6 +101,7 @@ public class DriversController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = FleetRoles.Administrators)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var deleted = await _mediator.Send(

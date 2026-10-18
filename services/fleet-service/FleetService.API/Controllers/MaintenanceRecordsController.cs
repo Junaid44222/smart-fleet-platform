@@ -1,4 +1,5 @@
 using FleetService.Application.DTOs;
+using FleetService.API.Authorization;
 using FleetService.Application.Features.MaintenanceRecords.Commands;
 using FleetService.Application.Features.MaintenanceRecords.Queries;
 using FleetService.Application.Responses;
@@ -58,6 +59,7 @@ public class MaintenanceRecordsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = FleetRoles.MaintenanceManagers)]
     public async Task<IActionResult> Create(
         [FromBody] CreateMaintenanceRecordDto dto)
     {
@@ -73,6 +75,7 @@ public class MaintenanceRecordsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = FleetRoles.MaintenanceManagers)]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateMaintenanceRecordDto dto)
@@ -98,6 +101,7 @@ public class MaintenanceRecordsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = FleetRoles.Administrators)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var deleted = await _mediator.Send(

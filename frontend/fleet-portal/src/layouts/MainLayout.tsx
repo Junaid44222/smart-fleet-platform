@@ -40,6 +40,7 @@ import {
   Analytics as AnalyticsIcon,
   SmartToy as AiIcon,
   Settings as SettingsIcon,
+  ManageAccounts as ManageAccountsIcon,
   Notifications as NotificationsIcon,
   Person as ProfileIcon,
   Logout as LogoutIcon,
@@ -76,6 +77,7 @@ interface MainLayoutProps {
   children: React.ReactNode;
   userName?: string;
   userInitials?: string;
+  userRole?: string;
 }
 
 interface SearchResult {
@@ -93,6 +95,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   children,
   userName = 'Fleet Manager',
   userInitials = 'FM',
+  userRole = 'Viewer',
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,6 +193,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const maintenanceDueCount = notificationsData?.stats.maintenanceDueCount ?? 0;
   const safetyScore = notificationsData?.stats.safetyScore ?? 100;
   const notificationCount = maintenanceDueCount + (safetyScore < 80 ? 1 : 0);
+  const canManageUsers = ['Admin', 'SuperAdmin'].includes(userRole);
+  const visibleNavItems: NavItem[] = canManageUsers
+    ? [...navItems, { label: 'User Management', path: '/users', icon: <ManageAccountsIcon /> }]
+    : navItems;
 
   useEffect(() => {
     void fetchDashboardStats()
@@ -211,7 +218,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       </Box>
 
       <List sx={{ flex: 1, px: 1.5, py: 2 }}>
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
               disabled={item.disabled}

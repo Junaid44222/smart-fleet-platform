@@ -22,6 +22,13 @@ ollama list
 
 The AI service development settings use `http://localhost:11434/v1` and model `qwen3:0.6b`. Restart the AI service after configuration changes. If Ollama is already running, do not start a second `ollama serve` process.
 
+If an existing Identity database has no Admin or SuperAdmin, provide bootstrap credentials only through environment variables before starting IdentityService. The bootstrap creates or promotes the configured account once and does not use a committed default password. Remove the environment variables after startup.
+
+```powershell
+$env:BootstrapAdmin__Email = 'admin@example.local'
+$env:BootstrapAdmin__Password = '<strong-bootstrap-password>'
+```
+
 For registered-vehicle questions, sign in to the portal first so the request includes the fleet JWT. For example, ask `What is the fuel capacity of MH01AB1005?`; the AI service looks up that registration through the gateway and grounds its answer in the matching FleetService record.
 
 Automated E2E checks use an existing test account and do not create accounts. Set credentials in the current PowerShell session before running the script:

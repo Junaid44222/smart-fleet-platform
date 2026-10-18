@@ -3,6 +3,8 @@ export interface ApiResponse<T> {
   message: string;
   data?: T;
   token?: string;
+  role?: string;
+  fullName?: string;
 }
 
 export interface Vehicle {
@@ -14,6 +16,11 @@ export interface Vehicle {
   fuelCapacity: number;
   status: string;
   createdAt: string;
+}
+
+export interface VehicleStatusChangeResult {
+  vehicle: Vehicle;
+  workOrder: MaintenanceRecord | null;
 }
 
 export interface Driver {
@@ -32,6 +39,16 @@ export interface Driver {
   createdBy: string;
   updatedBy?: string;
   isDeleted: boolean;
+}
+
+export interface VehicleAssignment {
+  id: string;
+  vehicleId: string;
+  driverId: string;
+  driverName: string;
+  employeeCode: string;
+  assignedDate: string;
+  releasedDate: string | null;
 }
 
 export interface MaintenanceRecord {

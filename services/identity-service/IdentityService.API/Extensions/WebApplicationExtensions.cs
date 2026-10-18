@@ -21,7 +21,12 @@ public static class WebApplicationExtensions
         {
             EnsureDatabaseExists(context);
             context.Database.Migrate();
-            AuthDbSeeder.Seed(context, passwordHasher);
+            AuthDbSeeder.Seed(context, passwordHasher, app.Configuration);
+            if (!context.Users.Any(user => user.Role == "Admin" || user.Role == "SuperAdmin"))
+            {
+                logger.LogWarning(
+                    "No Admin or SuperAdmin exists. Configure BootstrapAdmin:Email and BootstrapAdmin:Password once to bootstrap the first administrator.");
+            }
         }
         catch (Exception ex)
         {

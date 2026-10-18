@@ -100,6 +100,9 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 
 builder.Services.AddScoped<IVehicleService, VehicleService>();
+builder.Services.AddScoped<IAdministrativeVehicleService, AdministrativeVehicleService>();
+builder.Services.AddScoped<IVehicleAssignmentService, VehicleAssignmentService>();
+builder.Services.AddScoped<ITripService, TripService>();
 
 builder.Services.AddScoped<IDriverRepository, DriverRepository>();
 

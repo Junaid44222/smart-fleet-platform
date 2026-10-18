@@ -12,13 +12,16 @@ public class DriverService : IDriverService
     private readonly IDriverRepository _repository;
 
     private readonly IKafkaProducer _producer;
+    private readonly IVehicleAssignmentService _vehicleAssignmentService;
 
     public DriverService(
         IDriverRepository repository,
-        IKafkaProducer producer)
+        IKafkaProducer producer,
+        IVehicleAssignmentService vehicleAssignmentService)
     {
         _repository = repository;
         _producer = producer;
+        _vehicleAssignmentService = vehicleAssignmentService;
     }
 
     public async Task<IEnumerable<Driver>> GetAllAsync()
@@ -94,6 +97,11 @@ public class DriverService : IDriverService
                 "A driver with the same license number already exists.");
         }
 
+        if (string.Equals(dto.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            await _vehicleAssignmentService.ReleaseDriverAsync(id, "system", CancellationToken.None);
+        }
+
         driver.EmployeeCode = dto.EmployeeCode;
         driver.FirstName = dto.FirstName;
         driver.LastName = dto.LastName;
@@ -129,6 +137,8 @@ public class DriverService : IDriverService
         {
             return false;
         }
+
+        await _vehicleAssignmentService.ReleaseDriverAsync(id, "system", CancellationToken.None);
 
         driver.IsDeleted = true;
         driver.Status = "Inactive";

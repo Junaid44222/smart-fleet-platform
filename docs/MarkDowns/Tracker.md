@@ -167,6 +167,39 @@ Notes:
 - Built IdentityService; build succeeded with an existing `Microsoft.Build.Tasks.Core` NU1903 dependency advisory.
 - Verified through the gateway: a legacy account logged in and authenticated again after migration, an incorrect password returned 401, and a new account registered and logged in successfully.
 
+### Roles and Incident Workflow (2026-10-18)
+
+Agreed roles: `Admin`, `FleetManager`, `Dispatcher`, `MaintenanceTechnician`, `SafetyOfficer`, `Viewer`, and `Driver`. New public registrations remain `Dispatcher`; only `Admin`/`SuperAdmin` can assign roles. For accident handling, only `Admin` may place a vehicle out of service and create the resulting unplanned maintenance work order.
+
+Implementation checklist:
+- [x] Confirm role set and Admin-only incident permission.
+- [x] Add canonical role names and return the actual role during login.
+- [x] Restrict public registration to `Dispatcher`; add Admin/SuperAdmin role management.
+- [x] Enforce role policies on Fleet API write operations.
+- [x] Add an Admin-only incident operation that marks a vehicle out of service and creates an unplanned work order in one database save.
+- [x] Add Admin UI for status changes and incident maintenance creation.
+- [x] Add regression tests for declared role policies and allow/deny outcomes for Fleet and Identity role requirements.
+- [ ] Verify HTTP allow/deny behavior with signed role tokens and verify incident persistence plus transaction rollback against a database.
+
+Implementation progress (2026-10-18): Identity login returns the stored role, public registration always assigns `Dispatcher`, and Admin/SuperAdmin users can list users and update assignable roles. Fleet write endpoints now require role membership, with the incident/status endpoint restricted to `Admin` only as agreed. The vehicle detail UI exposes status and incident work-order creation to Admin users. IdentityService and FleetService API builds passed; `npm.cmd run build` passed in `frontend/fleet-portal` (with the existing large-chunk advisory). Added `FleetService.Tests`; 25 tests now pass, covering endpoint/controller authorization metadata and ASP.NET role requirement allow/deny outcomes, including proving `SuperAdmin` does not pass the Admin-only incident role requirement. Signed-token HTTP pipeline and database persistence/rollback verification remain outstanding. A compatible SQLite provider is not cached and NuGet network access is unavailable in this environment.
+
+### Vehicle Driver Assignment API (2026-10-18)
+
+- Replaced vehicle detail page `localStorage` assignment reads/writes with Fleet API calls.
+- Added `VehicleAssignments` history entity and SQL Server migration, with filtered unique indexes to allow only one active driver per vehicle and one active vehicle per driver.
+- Added authenticated current-assignment and history reads plus a role-protected assign/reassign/unassign endpoint. Assignment changes update driver status and publish `vehicle-driver-assignment-changed` events.
+- Releasing or soft-deleting/deactivating an assigned driver closes the active assignment.
+- Added FleetService role coverage for the assignment endpoint; FleetService API and FleetService.Tests builds passed, and the frontend production build passed with the existing large-bundle advisory.
+- Verification update (2026-10-18): `dotnet test services/fleet-service/FleetService.Tests/FleetService.Tests.csproj --no-restore` passed 29 tests. This covers assignment endpoint policy and role outcomes; assignment persistence remains unverified against a live relational database.
+
+### Trip Module (2026-10-18)
+
+- Added the Trip domain entity and lifecycle rules for Scheduled → InProgress → Completed, plus Scheduled → Cancelled.
+- Added authenticated trip list/detail APIs and role-protected schedule, start, complete, and cancel endpoints.
+- Trip creation validates dates, locations, vehicle/driver availability, and existing vehicle-driver assignments. Completion records actual end time, distance, and fuel consumed.
+- Added `Trips` SQL Server migration and Kafka events for trip created, started, completed, and cancelled.
+- `dotnet test services/fleet-service/FleetService.Tests/FleetService.Tests.csproj --no-restore` passed 38 tests, including Trip lifecycle and role policy coverage. Fleet API/test project compilation passed as part of the run. Database/event integration remains to be verified against running infrastructure.
+
 ### AI Assistant Frontend Pass (2026-10-18)
 
 - Updated the assistant page to display API failure messages, including the missing Azure OpenAI configuration response, instead of showing an empty generic answer.
@@ -591,7 +624,7 @@ Tasks:
 * [x] Rebuild Vehicle Inventory as searchable data table
 * [x] Wire Maintenance and Fuel pages to APIs
 * [x] Build AI Assistant page
-* [ ] Replace local vehicle-driver assignment storage with backend assignment API
+* [x] Replace local vehicle-driver assignment storage with backend assignment API
 
 Estimated:
 3-5 Days
@@ -601,11 +634,11 @@ Estimated:
 ### Backend Gaps
 
 Status:
-Pending
+In Progress
 
 Tasks:
 
-* [ ] Trip module (entity, API, events)
+* [x] Trip module (entity, API, events)
 * [ ] Fleet Service health checks (`/health`, `/health/ready`)
 * [ ] Phase 1 stabilization (centralized config, correlation ID logging)
 
