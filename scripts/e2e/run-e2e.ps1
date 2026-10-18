@@ -38,32 +38,7 @@ if ($null -ne $config.auth) {
             Write-Output "Failed to acquire token: $($_.Exception.Message)"
         }
     } else {
-        Write-Output "Auth config present but email/password empty; attempting auto-register + login"
-
-        # Try auto-registering a temporary user then login
-        try {
-            $ts = Get-Date -Format yyyyMMddHHmmss
-            $email = "e2e_user_$ts@example.local"
-            $password = ([guid]::NewGuid().ToString()).Substring(0,12)
-            $registerUrl = $tokenUrl -replace '/login$','/register'
-            if ($registerUrl -eq $tokenUrl) { $registerUrl = $tokenUrl.TrimEnd('/') + '/register' }
-
-            $regBody = @{ FullName = 'E2E User'; Email = $email; Password = $password; Role = 'Dispatcher' } | ConvertTo-Json
-            $regResp = Invoke-RestMethod -Uri $registerUrl -Method Post -Body $regBody -ContentType 'application/json' -ErrorAction Stop
-            Write-Output "Auto-registered E2E user: $email"
-
-            # attempt login
-            $body = @{ Email = $email; Password = $password } | ConvertTo-Json
-            $resp = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/json' -ErrorAction Stop
-            if ($resp -and $resp.Token) {
-                $token = $resp.Token
-                Write-Output "Acquired JWT token after auto-register"
-            } else {
-                Write-Output "Auth response received but token not found after register."
-            }
-        } catch {
-            Write-Output "Auto-register/login failed: $($_.Exception.Message)"
-        }
+        Write-Warning 'Authenticated E2E checks require E2E_AUTH_EMAIL and E2E_AUTH_PASSWORD; no test account will be created automatically.'
     }
 }
 

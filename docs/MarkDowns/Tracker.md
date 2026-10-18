@@ -204,8 +204,9 @@ Notes:
 - Live gateway verification confirmed maintenance history and fuel history responses for `MH01AB1005`; a query for `MH99ZZ9999` correctly returned that no matching vehicle was found.
 - Added automated end-to-end smoke coverage for vehicle fuel capacity, maintenance history, and unknown registrations through the AI gateway.
 - The E2E runner now supports authenticated JSON POST requests, per-endpoint timeouts, and response-content assertions.
-- Local E2E run passed all six required checks, including all three AI question scenarios. Auto-registration created an E2E identity that the runner does not yet clean up.
-- Next: add coverage for fuel-history answers and ensure E2E test identities are cleaned up or reused safely.
+- Added fuel-history E2E coverage and removed automatic account creation; authenticated checks now require `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` from the environment.
+- Local E2E run passed all seven required checks, including fuel capacity, maintenance history, fuel history, and unknown registration. It reused the configured existing account and created no new account.
+- Next: add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
 
 ---
 

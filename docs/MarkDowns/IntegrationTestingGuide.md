@@ -24,6 +24,14 @@ The AI service development settings use `http://localhost:11434/v1` and model `q
 
 For registered-vehicle questions, sign in to the portal first so the request includes the fleet JWT. For example, ask `What is the fuel capacity of MH01AB1005?`; the AI service looks up that registration through the gateway and grounds its answer in the matching FleetService record.
 
+Automated E2E checks use an existing test account and do not create accounts. Set credentials in the current PowerShell session before running the script:
+
+```powershell
+$env:E2E_AUTH_EMAIL = 'your-e2e-account@example.local'
+$env:E2E_AUTH_PASSWORD = '<test-account-password>'
+.\scripts\e2e\run-e2e.ps1
+```
+
 To use Azure OpenAI instead, set these environment variables before starting the AI service; keep the key out of source control:
 
 ```powershell

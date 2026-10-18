@@ -41,6 +41,18 @@
       "auth": true
     },
     {
+      "name": "AI vehicle fuel history",
+      "url": "http://localhost:5000/ai/AiAssistant/chat",
+      "method": "POST",
+      "body": {
+        "message": "Show the fuel history for MH01AB1005."
+      },
+      "expectContains": "120.5",
+      "timeoutSec": 180,
+      "required": true,
+      "auth": true
+    },
+    {
       "name": "AI unknown vehicle registration",
       "url": "http://localhost:5000/ai/AiAssistant/chat",
       "method": "POST",
