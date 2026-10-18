@@ -1,13 +1,14 @@
 using IdentityService.API.Data;
 using IdentityService.API.Models;
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.AspNetCore.Identity;
 
 namespace IdentityService.API.Extensions;
 
 public static class AuthDbSeeder
 {
-    public static void Seed(AuthDbContext context)
+    public static void Seed(
+        AuthDbContext context,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         if (context.Users.Any())
         {
@@ -19,19 +20,12 @@ public static class AuthDbSeeder
             Id = Guid.NewGuid(),
             FullName = "System Admin",
             Email = "admin@smartfleet.com",
-            PasswordHash = HashPassword("Admin@123"),
             Role = "SuperAdmin"
         };
+        admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
 
         context.Users.Add(admin);
         context.SaveChanges();
     }
 
-    private static string HashPassword(string password)
-    {
-        using var sha256 = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(password);
-        var hash = sha256.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
-    }
 }

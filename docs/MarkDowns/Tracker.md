@@ -160,6 +160,13 @@ Notes:
 - The smoke script auto-registered an E2E identity because no credentials were configured; the script does not currently clean up that account.
 - Frontend sign-in completed against the gateway-backed Identity API and reached the dashboard.
 
+### Identity Password Hash Hardening (2026-10-18)
+
+- Replaced unsalted SHA-256 password storage with ASP.NET Core's salted PBKDF2 `PasswordHasher` for new registrations and admin seeding.
+- Existing SHA-256 hashes are verified with a constant-time comparison and upgraded only after a successful login, preserving existing accounts.
+- Built IdentityService; build succeeded with an existing `Microsoft.Build.Tasks.Core` NU1903 dependency advisory.
+- Verified through the gateway: a legacy account logged in and authenticated again after migration, an incorrect password returned 401, and a new account registered and logged in successfully.
+
 ### AI Assistant Frontend Pass (2026-10-18)
 
 - Updated the assistant page to display API failure messages, including the missing Azure OpenAI configuration response, instead of showing an empty generic answer.

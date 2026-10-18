@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
-using System.Text;
 using IdentityService.API.Data;
 using IdentityService.API.DTOs;
 using IdentityService.API.Models;
 using IdentityService.API.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,12 +17,16 @@ public class AuthController : ControllerBase
 
     private readonly IJwtTokenService _jwtTokenService;
 
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+
     public AuthController(
         AuthDbContext context,
-        IJwtTokenService jwtTokenService)
+        IJwtTokenService jwtTokenService,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _context = context;
         _jwtTokenService = jwtTokenService;
+        _passwordHasher = passwordHasher;
     }
 
     [HttpPost("register")]
@@ -48,9 +52,9 @@ public class AuthController : ControllerBase
             Id = Guid.NewGuid(),
             FullName = request.FullName,
             Email = request.Email,
-            PasswordHash = HashPassword(request.Password),
             Role = request.Role
         };
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
         _context.Users.Add(user);
 
@@ -68,16 +72,11 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login(
         LoginRequestDto request)
     {
-        var hashedPassword =
-            HashPassword(request.Password);
-
         var user = await _context.Users
             .FirstOrDefaultAsync(
-                x =>
-                    x.Email == request.Email &&
-                    x.PasswordHash == hashedPassword);
+                x => x.Email == request.Email);
 
-        if (user == null)
+        if (user is null)
         {
             return Unauthorized(
                 new AuthResponseDto
@@ -85,6 +84,22 @@ public class AuthController : ControllerBase
                     Success = false,
                     Message = "Invalid credentials"
                 });
+        }
+
+        if (!VerifyPassword(user, request.Password, out var shouldRehash))
+        {
+            return Unauthorized(
+                new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid credentials"
+                });
+        }
+
+        if (shouldRehash)
+        {
+            user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+            await _context.SaveChangesAsync();
         }
 
         var token =
@@ -99,14 +114,53 @@ public class AuthController : ControllerBase
             });
     }
 
-    private static string HashPassword(string password)
+    private bool VerifyPassword(
+        ApplicationUser user,
+        string password,
+        out bool shouldRehash)
     {
-        using var sha256 = SHA256.Create();
+        var legacyMatch = VerifyLegacySha256(
+            user.PasswordHash,
+            password,
+            out var isLegacyHash);
 
-        var bytes = Encoding.UTF8.GetBytes(password);
+        if (isLegacyHash)
+        {
+            shouldRehash = legacyMatch;
+            return legacyMatch;
+        }
 
-        var hash = sha256.ComputeHash(bytes);
+        var result = _passwordHasher.VerifyHashedPassword(
+            user,
+            user.PasswordHash,
+            password);
+        shouldRehash = result == PasswordVerificationResult.SuccessRehashNeeded;
+        return result != PasswordVerificationResult.Failed;
+    }
 
-        return Convert.ToBase64String(hash);
+    private static bool VerifyLegacySha256(
+        string storedHash,
+        string password,
+        out bool isLegacyHash)
+    {
+        isLegacyHash = false;
+        byte[] expectedHash;
+        try
+        {
+            expectedHash = Convert.FromBase64String(storedHash);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        if (expectedHash.Length != 32)
+        {
+            return false;
+        }
+
+        isLegacyHash = true;
+        var passwordHash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password));
+        return CryptographicOperations.FixedTimeEquals(passwordHash, expectedHash);
     }
 }

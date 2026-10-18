@@ -1,4 +1,6 @@
 using IdentityService.API.Data;
+using IdentityService.API.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,12 +15,13 @@ public static class WebApplicationExtensions
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<WebApplication>>();
         var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<ApplicationUser>>();
 
         try
         {
             EnsureDatabaseExists(context);
             context.Database.Migrate();
-            AuthDbSeeder.Seed(context);
+            AuthDbSeeder.Seed(context, passwordHasher);
         }
         catch (Exception ex)
         {

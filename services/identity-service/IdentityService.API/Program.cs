@@ -1,8 +1,10 @@
 using System.Text;
 using IdentityService.API.Data;
 using IdentityService.API.Extensions;
+using IdentityService.API.Models;
 using IdentityService.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -69,6 +71,10 @@ builder.Services.AddDbContext<AuthDbContext>(
 builder.Services.AddScoped<
     IJwtTokenService,
     JwtTokenService>();
+
+builder.Services.AddScoped<
+    IPasswordHasher<ApplicationUser>,
+    PasswordHasher<ApplicationUser>>();
 
 builder.Services.AddAuthentication(
         JwtBearerDefaults.AuthenticationScheme)
