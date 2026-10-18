@@ -195,7 +195,10 @@ Notes:
 - Verified the exact question `what is the Fuel capacity of MH01AB1005 vehicle registered in Smart fleet system` through the gateway and signed-in browser; answer: `The fuel capacity of MH01AB1005 is 350 litres.`
 - Extended grounded context to matching maintenance and fuel records, filtering both by the registered vehicle ID.
 - Live gateway verification confirmed maintenance history and fuel history responses for `MH01AB1005`; a query for `MH99ZZ9999` correctly returned that no matching vehicle was found.
-- Next: add automated end-to-end smoke coverage for known and unknown vehicle questions through the AI gateway.
+- Added automated end-to-end smoke coverage for vehicle fuel capacity, maintenance history, and unknown registrations through the AI gateway.
+- The E2E runner now supports authenticated JSON POST requests, per-endpoint timeouts, and response-content assertions.
+- Local E2E run passed all six required checks, including all three AI question scenarios. Auto-registration created an E2E identity that the runner does not yet clean up.
+- Next: add coverage for fuel-history answers and ensure E2E test identities are cleaned up or reused safely.
 
 ---
 

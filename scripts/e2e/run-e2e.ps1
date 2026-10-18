@@ -103,9 +103,34 @@ foreach ($ep in $config.endpoints) {
             }
         }
 
-        $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec $TimeoutSec -Headers $headers -ErrorAction Stop
+        $method = if ($ep.method) { [string]$ep.method } else { 'GET' }
+        $endpointTimeout = if ($ep.timeoutSec) { [int]$ep.timeoutSec } else { $TimeoutSec }
+        $request = @{
+            Uri = $url
+            Method = $method
+            UseBasicParsing = $true
+            TimeoutSec = $endpointTimeout
+            Headers = $headers
+            ErrorAction = 'Stop'
+        }
+        if ($ep.PSObject.Properties.Match('body').Count -gt 0) {
+            $request.Body = $ep.body | ConvertTo-Json -Depth 10 -Compress
+            $request.ContentType = 'application/json'
+        }
+
+        $resp = Invoke-WebRequest @request
         $status = $resp.StatusCode
         $success = ($status -ge 200 -and $status -lt 300)
+        $validationError = $null
+        if ($success -and $ep.expectContains) {
+            foreach ($expectedText in @($ep.expectContains)) {
+                if ($resp.Content -notmatch [regex]::Escape([string]$expectedText)) {
+                    $success = $false
+                    $validationError = "Response did not contain expected text: $expectedText"
+                    break
+                }
+            }
+        }
         $elapsed = (Get-Date) - $start
         $results += [pscustomobject]@{
             name = $ep.name
@@ -113,9 +138,14 @@ foreach ($ep in $config.endpoints) {
             status = $status
             success = $success
             timeMs = [int]$elapsed.TotalMilliseconds
+            error = $validationError
         }
         if (-not $success -and $ep.required) { $allPassed = $false }
-        Write-Output "[OK] $($ep.name) -> $status ($($elapsed.TotalMilliseconds)ms)"
+        if ($success) {
+            Write-Output "[OK] $($ep.name) -> $status ($($elapsed.TotalMilliseconds)ms)"
+        } else {
+            Write-Output "[FAIL] $($ep.name) -> $validationError"
+        }
     } catch {
         $elapsed = (Get-Date) - $start
         $errorMsg = $_.Exception.Message

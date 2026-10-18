@@ -15,6 +15,42 @@
       "url": "http://localhost:5000/fleet/Vehicles",
       "required": true,
       "auth": true
+    },
+    {
+      "name": "AI vehicle fuel capacity",
+      "url": "http://localhost:5000/ai/AiAssistant/chat",
+      "method": "POST",
+      "body": {
+        "message": "What is the fuel capacity of MH01AB1005?"
+      },
+      "expectContains": "350",
+      "timeoutSec": 180,
+      "required": true,
+      "auth": true
+    },
+    {
+      "name": "AI vehicle maintenance history",
+      "url": "http://localhost:5000/ai/AiAssistant/chat",
+      "method": "POST",
+      "body": {
+        "message": "What maintenance work has been done on MH01AB1005?"
+      },
+      "expectContains": "Brake Inspection",
+      "timeoutSec": 180,
+      "required": true,
+      "auth": true
+    },
+    {
+      "name": "AI unknown vehicle registration",
+      "url": "http://localhost:5000/ai/AiAssistant/chat",
+      "method": "POST",
+      "body": {
+        "message": "What is the fuel capacity of MH99ZZ9999?"
+      },
+      "expectContains": "no matching vehicle",
+      "timeoutSec": 180,
+      "required": true,
+      "auth": true
     }
   ]
   ,
