@@ -244,14 +244,14 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
   - [x] Audit frontend write actions and hide or disable actions users' roles cannot perform.
   - [x] Run relevant backend/frontend checks and record results.
   - Backend HTTP verification: signed-in Viewer can read maintenance/fuel details (200); missing records return 404; anonymous requests return 401.
-  - Frontend role guards now match API policy for vehicle creation, driver creation, vehicle/driver assignment, Admin-only vehicle status changes, and Admin/SuperAdmin user management. The navigation link, route guard, and profile role badge use the same policy helpers.
+  - Frontend role guards now match API policy for vehicle creation, driver creation, vehicle/driver assignment, Admin/SuperAdmin vehicle status changes, and Admin/SuperAdmin user management. The navigation link, route guard, and profile role badge use the same policy helpers.
   - Validation: FleetService tests 48 passed, 0 failed, 0 skipped; frontend permission matrix 9 passed; `npm.cmd run lint` and `npm.cmd run build` passed. Build retains the existing large-chunk advisory.
 
 ### Incident Workflow HTTP/Database Verification (Complete, 2026-10-20)
 
-- Scope: exercise the vehicle status endpoint through signed JWT authentication and verify the Admin-only rule, persisted vehicle/work-order updates, and rollback when the work-order write fails.
-- Existing implementation already requires the `Admin` role and writes the vehicle status plus unplanned maintenance record in one `SaveChangesAsync` call; this task adds missing HTTP/database verification.
-- Added opt-in Kestrel/JWT/SQL Server integration tests for anonymous rejection, non-Admin denial, Admin persistence, and rollback after a deliberately invalid work-order insert.
+- Scope: exercise the vehicle status endpoint through signed JWT authentication and verify the Admin/SuperAdmin administrator policy, persisted vehicle/work-order updates, and rollback when the work-order write fails.
+- Existing implementation requires the `Admin` or `SuperAdmin` role and writes the vehicle status plus unplanned maintenance record in one `SaveChangesAsync` call; this task adds missing HTTP/database verification.
+- Added opt-in Kestrel/JWT/SQL Server integration tests for anonymous rejection, non-administrator denial, Admin persistence, and rollback after a deliberately invalid work-order insert.
 - Local environment check: the configured SQL Server container was available after running the test command with local database access.
 - Validation: `dotnet test services/fleet-service/FleetService.Tests/FleetService.Tests.csproj --no-restore` passed against `SmartFleetDb`: 42 passed, 0 failed, 0 skipped. This includes anonymous 401, signed non-Admin 403, signed Admin persistence of both status and work order, and rollback after a SQL constraint failure.
 - The HTTP/database tests require `FLEET_TEST_CONNECTION_STRING` to point to a migrated, disposable SQL Server database; they skip with an explicit reason when it is unset or unavailable. Each test removes its temporary vehicle and related work orders.
@@ -282,6 +282,14 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - Stopped the stale FleetService instance, rebuilt the API from current source, and restarted it. It is listening on port 5081.
 - Live check: the status endpoint through the gateway returns 401 with no token, as expected; backend role-policy tests verify SuperAdmin is authorized.
 - Commit: completed (`docs(tracker): record status policy runtime fix`).
+
+### Fleet Service Health Checks (Complete — 2026-10-20)
+
+- Scope: add `/health` liveness and `/health/ready` readiness endpoints; readiness must verify database connectivity.
+- Added public `/health` liveness response and `/health/ready` readiness check backed by SQL Server connectivity, with JSON health details and correct healthy/unhealthy HTTP status handling.
+- Verification: FleetService API build passed; live checks on the configured port returned `Healthy` for liveness and `Healthy` for readiness/database; FleetService test suite passed (58/58).
+- Existing package vulnerability/version warnings are unchanged.
+- Commit: completed (`feat(fleet): add liveness and readiness health checks`).
 
 ---
 
@@ -338,7 +346,7 @@ Status: Completed
 * [x] Kafka Consumer
 * [ ] Maintenance API integration tests
 * [ ] Fuel API integration tests
-* [ ] Health check endpoint
+* [x] Health check endpoint (`/health`, `/health/ready`)
 
 ---
 
@@ -681,7 +689,7 @@ In Progress
 Tasks:
 
 * [x] Trip module (entity, API, events)
-* [ ] Fleet Service health checks (`/health`, `/health/ready`)
+* [x] Fleet Service health checks (`/health`, `/health/ready`)
 * [ ] Phase 1 stabilization (centralized config, correlation ID logging)
 
 Estimated:
