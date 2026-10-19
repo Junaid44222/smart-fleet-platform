@@ -13,4 +13,6 @@ public interface IVehicleRepository
     Task UpdateAsync(Vehicle vehicle);
 
     Task DeleteAsync(Vehicle vehicle);
+
+    Task<bool> HasRelatedRecordsAsync(Guid id);
 }

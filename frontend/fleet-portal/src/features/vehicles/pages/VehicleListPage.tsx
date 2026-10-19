@@ -15,14 +15,14 @@ import {
   Alert,
   Typography,
 } from '@mui/material';
-import { Add, Visibility } from '@mui/icons-material';
-import { fetchVehicles, createVehicle } from '../../../api/fleetApi';
+import { Add, DeleteOutlined, Edit, Visibility } from '@mui/icons-material';
+import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '../../../api/fleetApi';
 import type { Vehicle } from '../../../api/types';
 import PageHeader from '../../../components/PageHeader';
 import FilterBar from '../../../components/FilterBar';
 import DataTable from '../../../components/DataTable';
 import StatusBadge from '../../../components/StatusBadge';
-import { canCreateVehicle } from '../../../auth/rolePermissions';
+import { canCreateVehicle, canDeleteVehicle, canUpdateVehicle } from '../../../auth/rolePermissions';
 
 type ApiError = {
   response?: {
@@ -49,6 +49,8 @@ const VehicleListPage: React.FC = () => {
   const navigate = useNavigate();
   const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
   const userCanCreateVehicle = canCreateVehicle(userRole);
+  const userCanUpdateVehicle = canUpdateVehicle(userRole);
+  const userCanDeleteVehicle = canDeleteVehicle(userRole);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,6 +61,8 @@ const VehicleListPage: React.FC = () => {
 
   // Dialog state
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [newVehicle, setNewVehicle] = useState({
     vehicleNumber: '',
     manufacturer: '',
@@ -94,12 +98,27 @@ const VehicleListPage: React.FC = () => {
 
   const handleOpenAddDialog = () => {
     if (!userCanCreateVehicle) return;
+    setEditingVehicle(null);
     setNewVehicle({
       vehicleNumber: '',
       manufacturer: '',
       model: '',
       year: new Date().getFullYear(),
       fuelCapacity: 60,
+    });
+    setFormError('');
+    setOpenAddDialog(true);
+  };
+
+  const handleOpenEditDialog = (vehicle: Vehicle) => {
+    if (!userCanUpdateVehicle) return;
+    setEditingVehicle(vehicle);
+    setNewVehicle({
+      vehicleNumber: vehicle.vehicleNumber,
+      manufacturer: vehicle.manufacturer,
+      model: vehicle.model,
+      year: vehicle.year,
+      fuelCapacity: vehicle.fuelCapacity,
     });
     setFormError('');
     setOpenAddDialog(true);
@@ -146,23 +165,49 @@ const VehicleListPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await createVehicle({
+      const payload = {
         vehicleNumber: newVehicle.vehicleNumber,
         manufacturer: newVehicle.manufacturer,
         model: newVehicle.model,
         year: Number(newVehicle.year),
         fuelCapacity: Number(newVehicle.fuelCapacity),
-      });
+      };
+      if (editingVehicle) {
+        await updateVehicle(editingVehicle.id, payload);
+      } else {
+        await createVehicle(payload);
+      }
       setToast({
         open: true,
-        message: 'Vehicle added successfully!',
+        message: editingVehicle ? 'Vehicle updated successfully.' : 'Vehicle added successfully.',
         severity: 'success',
       });
       setOpenAddDialog(false);
-      loadVehicles(); // Refresh table
+      setEditingVehicle(null);
+      await loadVehicles();
     } catch (error: unknown) {
       const apiError = error as ApiError;
       setFormError(apiError.response?.data?.message || 'Failed to create vehicle.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteVehicle = async () => {
+    if (!vehicleToDelete || !userCanDeleteVehicle) return;
+    setSubmitting(true);
+    try {
+      await deleteVehicle(vehicleToDelete.id);
+      setVehicleToDelete(null);
+      setToast({ open: true, message: 'Vehicle deleted successfully.', severity: 'success' });
+      await loadVehicles();
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      setToast({
+        open: true,
+        message: apiError.response?.data?.message || 'Failed to delete vehicle.',
+        severity: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -234,6 +279,26 @@ const VehicleListPage: React.FC = () => {
               <Visibility fontSize="small" />
             </IconButton>
           </Tooltip>
+          {userCanUpdateVehicle && (
+            <Tooltip title="Edit vehicle">
+              <IconButton size="small" aria-label={`Edit ${row.vehicleNumber}`} onClick={(event) => {
+                event.stopPropagation();
+                handleOpenEditDialog(row);
+              }}>
+                <Edit fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {userCanDeleteVehicle && (
+            <Tooltip title="Delete vehicle">
+              <IconButton size="small" color="error" aria-label={`Delete ${row.vehicleNumber}`} onClick={(event) => {
+                event.stopPropagation();
+                setVehicleToDelete(row);
+              }}>
+                <DeleteOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       ),
     },
@@ -280,9 +345,8 @@ const VehicleListPage: React.FC = () => {
         </>
       )}
 
-      {/* Add Vehicle Dialog */}
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add New Vehicle</DialogTitle>
+        <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
         <form onSubmit={handleAddVehicle}>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {formError && <Alert severity="error">{formError}</Alert>}
@@ -337,10 +401,25 @@ const VehicleListPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" variant="contained" color="primary" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add Vehicle'}
+              {submitting ? 'Saving...' : editingVehicle ? 'Save Changes' : 'Add Vehicle'}
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      <Dialog open={Boolean(vehicleToDelete)} onClose={() => !submitting && setVehicleToDelete(null)}>
+        <DialogTitle>Delete vehicle?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete {vehicleToDelete?.vehicleNumber}? Vehicles with assignment, trip, maintenance, or fuel history cannot be deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVehicleToDelete(null)} disabled={submitting}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleDeleteVehicle()} disabled={submitting}>
+            {submitting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar
@@ -357,4 +436,3 @@ const VehicleListPage: React.FC = () => {
 };
 
 export default VehicleListPage;
-

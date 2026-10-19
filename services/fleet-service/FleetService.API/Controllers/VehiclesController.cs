@@ -75,15 +75,76 @@ public class VehiclesController : ControllerBase
     public async Task<IActionResult> Create(
         [FromBody] CreateVehicleDto dto)
     {
-        var result = await _mediator.Send(
-            new CreateVehicleCommand(dto));
-
-        return Ok(new ApiResponse<object>
+        try
         {
-            Success = true,
-            Message = "Vehicle created successfully",
-            Data = result
-        });
+            var result = await _mediator.Send(new CreateVehicleCommand(dto));
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Vehicle created successfully",
+                Data = result
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = FleetRoles.FleetManagers)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVehicleDto dto)
+    {
+        try
+        {
+            var result = await _mediator.Send(new UpdateVehicleCommand(id, dto));
+            return result is null
+                ? NotFound(new ApiResponse<object> { Success = false, Message = "Vehicle not found" })
+                : Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = "Vehicle updated successfully",
+                    Data = result
+                });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = FleetRoles.Administrators)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        try
+        {
+            var deleted = await _mediator.Send(new DeleteVehicleCommand(id));
+            return deleted
+                ? Ok(new ApiResponse<object> { Success = true, Message = "Vehicle deleted successfully" })
+                : NotFound(new ApiResponse<object> { Success = false, Message = "Vehicle not found" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new ApiResponse<object>
+            {
+                Success = false,
+                Message = "This vehicle has related fleet records and cannot be deleted."
+            });
+        }
     }
 
     /// <summary>Returns the vehicle's current driver assignment, or null if the vehicle is unassigned.</summary>

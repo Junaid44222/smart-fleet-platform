@@ -257,6 +257,15 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - The HTTP/database tests require `FLEET_TEST_CONNECTION_STRING` to point to a migrated, disposable SQL Server database; they skip with an explicit reason when it is unset or unavailable. Each test removes its temporary vehicle and related work orders.
 - Status: complete; the FleetService test suite passed with the configured local SQL Server database.
 
+### Fleet List CRUD Coverage (Complete — 2026-10-20)
+
+- Scope: provide Add, Update, and Delete actions on vehicle, driver, maintenance, and fuel lists; Admin and SuperAdmin must have access to all actions.
+- Added create/update/delete controls and forms to Vehicle, Driver, Maintenance, and Fuel lists. Admin and SuperAdmin can use all list actions; existing FleetManager and MaintenanceTechnician create/update permissions remain aligned with the API policies.
+- Added vehicle update/delete API operations, case-insensitive registration uniqueness checks, and a delete guard that preserves vehicles with assignments, trips, maintenance, or fuel history.
+- Added role matrix and backend vehicle CRUD service tests; API authorization metadata now covers vehicle update/delete.
+- Verification: frontend permission tests passed (9/9), lint passed, production build passed, and FleetService tests passed (54/54). Production build reports the existing large JavaScript chunk advisory; .NET restore reports existing dependency vulnerability/version warnings.
+- Commit: completed (`feat(fleet): add CRUD actions to fleet lists`).
+
 ---
 
 # Completed Tasks

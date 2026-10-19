@@ -41,4 +41,10 @@ public class VehicleRepository : IVehicleRepository
         _context.Vehicles.Remove(vehicle);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<bool> HasRelatedRecordsAsync(Guid id) =>
+        await _context.VehicleAssignments.AnyAsync(item => item.VehicleId == id) ||
+        await _context.Trips.AnyAsync(item => item.VehicleId == id) ||
+        await _context.MaintenanceRecords.AnyAsync(item => item.VehicleId == id) ||
+        await _context.FuelRecords.AnyAsync(item => item.VehicleId == id);
 }

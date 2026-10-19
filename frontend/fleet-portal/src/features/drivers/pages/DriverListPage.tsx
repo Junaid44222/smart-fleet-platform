@@ -15,11 +15,15 @@ import {
   Snackbar,
   Alert,
   Typography,
+  IconButton,
+  Tooltip,
+  MenuItem,
 } from '@mui/material';
+import { DeleteOutlined, Edit } from '@mui/icons-material';
 import PageHeader from '../../../components/PageHeader';
-import { fetchDrivers, createDriver } from '../../../api/fleetApi';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver } from '../../../api/fleetApi';
 import type { Driver } from '../../../api/types';
-import { canCreateDriver } from '../../../auth/rolePermissions';
+import { canCreateDriver, canDeleteDriver, canUpdateDriver } from '../../../auth/rolePermissions';
 
 type ApiError = {
   response?: {
@@ -33,10 +37,14 @@ const DriverListPage: React.FC = () => {
   const navigate = useNavigate();
   const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
   const userCanCreateDriver = canCreateDriver(userRole);
+  const userCanUpdateDriver = canUpdateDriver(userRole);
+  const userCanDeleteDriver = canDeleteDriver(userRole);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -73,6 +81,7 @@ const DriverListPage: React.FC = () => {
 
   const handleOpenAddDialog = () => {
     if (!userCanCreateDriver) return;
+    setEditingDriver(null);
     setFormError('');
     setNewDriver({
       employeeCode: '',
@@ -84,6 +93,24 @@ const DriverListPage: React.FC = () => {
       licenseExpiryDate: '',
       joiningDate: '',
       status: 'Active',
+    });
+    setOpenAddDialog(true);
+  };
+
+  const handleOpenEditDialog = (driver: Driver) => {
+    if (!userCanUpdateDriver) return;
+    setEditingDriver(driver);
+    setFormError('');
+    setNewDriver({
+      employeeCode: driver.employeeCode,
+      firstName: driver.firstName,
+      lastName: driver.lastName,
+      email: driver.email,
+      phoneNumber: driver.phoneNumber,
+      licenseNumber: driver.licenseNumber,
+      licenseExpiryDate: driver.licenseExpiryDate.slice(0, 10),
+      joiningDate: driver.joiningDate.slice(0, 10),
+      status: driver.status,
     });
     setOpenAddDialog(true);
   };
@@ -120,7 +147,7 @@ const DriverListPage: React.FC = () => {
     setSubmitting(true);
 
     try {
-      await createDriver({
+      const payload = {
         employeeCode: newDriver.employeeCode ?? `DRV-${Math.floor(1000 + Math.random() * 9000)}`,
         firstName: newDriver.firstName?.trim() ?? '',
         lastName: newDriver.lastName?.trim() ?? '',
@@ -130,15 +157,45 @@ const DriverListPage: React.FC = () => {
         licenseExpiryDate: new Date(newDriver.licenseExpiryDate ?? '').toISOString(),
         joiningDate: new Date(newDriver.joiningDate ?? '').toISOString(),
         status: newDriver.status ?? 'Active',
-      });
+      };
+      if (editingDriver) {
+        await updateDriver(editingDriver.id, payload);
+      } else {
+        await createDriver(payload);
+      }
 
-      setToast({ open: true, message: 'Driver added successfully!', severity: 'success' });
+      setToast({
+        open: true,
+        message: editingDriver ? 'Driver updated successfully.' : 'Driver added successfully.',
+        severity: 'success',
+      });
       setOpenAddDialog(false);
+      setEditingDriver(null);
       const refreshed = await fetchDrivers();
       setDrivers(refreshed);
     } catch (error: unknown) {
       const apiError = error as ApiError;
       setFormError(apiError.response?.data?.message || 'Failed to add driver.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteDriver = async () => {
+    if (!driverToDelete || !userCanDeleteDriver) return;
+    setSubmitting(true);
+    try {
+      await deleteDriver(driverToDelete.id);
+      setDriverToDelete(null);
+      setToast({ open: true, message: 'Driver deleted successfully.', severity: 'success' });
+      setDrivers(await fetchDrivers());
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      setToast({
+        open: true,
+        message: apiError.response?.data?.message || 'Failed to delete driver.',
+        severity: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -181,6 +238,30 @@ const DriverListPage: React.FC = () => {
               }}
             >
               <CardContent>
+                {(userCanUpdateDriver || userCanDeleteDriver) && (
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    {userCanUpdateDriver && (
+                      <Tooltip title="Edit driver">
+                        <IconButton aria-label={`Edit ${driver.firstName} ${driver.lastName}`} onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenEditDialog(driver);
+                        }}>
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {userCanDeleteDriver && (
+                      <Tooltip title="Delete driver">
+                        <IconButton color="error" aria-label={`Delete ${driver.firstName} ${driver.lastName}`} onClick={(event) => {
+                          event.stopPropagation();
+                          setDriverToDelete(driver);
+                        }}>
+                          <DeleteOutlined fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                )}
                 <Typography variant="h6">{driver.firstName} {driver.lastName}</Typography>
                 <Typography variant="body2" color="text.secondary">
                   {driver.email}
@@ -195,7 +276,7 @@ const DriverListPage: React.FC = () => {
       )}
 
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Add New Driver</DialogTitle>
+        <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
         <form onSubmit={handleAddDriver}>
           <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
             {formError && <Alert severity="error">{formError}</Alert>}
@@ -268,16 +349,40 @@ const DriverListPage: React.FC = () => {
               slotProps={{ inputLabel: { shrink: true } }}
               disabled={submitting}
             />
+            <TextField
+              select
+              label="Status"
+              value={newDriver.status ?? 'Active'}
+              onChange={(event) => handleFieldChange('status', event.target.value)}
+              disabled={submitting}
+            >
+              {['Active', 'Inactive', 'OnLeave'].map((status) => <MenuItem key={status} value={status}>{status}</MenuItem>)}
+            </TextField>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseAddDialog} color="secondary" disabled={submitting}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add Driver'}
+              {submitting ? 'Saving...' : editingDriver ? 'Save Changes' : 'Add Driver'}
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      <Dialog open={Boolean(driverToDelete)} onClose={() => !submitting && setDriverToDelete(null)}>
+        <DialogTitle>Delete driver?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete {driverToDelete?.firstName} {driverToDelete?.lastName}? This also releases any active vehicle assignment.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDriverToDelete(null)} disabled={submitting}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleDeleteDriver()} disabled={submitting}>
+            {submitting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Snackbar
