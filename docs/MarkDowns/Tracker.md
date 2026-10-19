@@ -2,7 +2,7 @@
 
 # Smart Fleet Platform - Development Tracker
 
-Last Updated: 2026-10-18
+Last Updated: 2026-10-20
 
 Project Status: In Progress
 
@@ -344,9 +344,13 @@ Status: Completed
 * [x] Dashboard Stats API
 * [x] Kafka Producer
 * [x] Kafka Consumer
-* [ ] Maintenance API integration tests
-* [ ] Fuel API integration tests
+* [x] Maintenance API integration tests
+  * [x] Cover authenticated create, list/detail read, update, and delete over HTTP.
+* [x] Fuel API integration tests
+  * [x] Cover authenticated create, list/detail read, update, and delete over HTTP.
 * [x] Health check endpoint (`/health`, `/health/ready`)
+
+Verification (2026-10-20): Maintenance and Fuel API create/list/detail/update/soft-delete workflows passed over HTTP against the configured Fleet SQL database. Full `FleetService.Tests` run: 67 passed, 0 failed.
 
 ---
 

@@ -65,7 +65,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         builder.Services.AddScoped<IMaintenanceRecordService, MaintenanceRecordService>();
         builder.Services.AddScoped<IFuelRecordRepository, FuelRecordRepository>();
         builder.Services.AddScoped<IFuelRecordService, FuelRecordService>();
-        builder.Services.AddSingleton<IKafkaProducer, KafkaProducerService>();
+        builder.Services.AddSingleton<IKafkaProducer, NoOpKafkaProducer>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -248,6 +248,158 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task MaintenanceRecordsApi_SupportsCreateListDetailUpdateAndDelete()
+    {
+        await EnsureConfiguredAsync();
+        var vehicleId = await CreateVehicleAsync();
+
+        try
+        {
+            var createDate = DateTime.UtcNow.Date.AddDays(2);
+            using var createRequest = AuthenticatedJsonRequest(
+                HttpMethod.Post,
+                "/api/MaintenanceRecords",
+                "MaintenanceTechnician",
+                new
+                {
+                    vehicleId,
+                    serviceType = "Integration API Service",
+                    description = "Created through the maintenance API",
+                    scheduledDate = createDate,
+                    cost = 245.50m,
+                    vendor = "Integration Vendor",
+                    status = "Scheduled"
+                });
+            using var createResponse = await _client!.SendAsync(createRequest);
+
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            using var createdJson = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+            var recordId = createdJson.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+            Assert.Equal("Integration API Service", createdJson.RootElement.GetProperty("data").GetProperty("serviceType").GetString());
+
+            using var listRequest = AuthenticatedGet("/api/MaintenanceRecords", "Viewer");
+            using var listResponse = await _client.SendAsync(listRequest);
+            Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+            using var listJson = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+            Assert.Contains(
+                listJson.RootElement.GetProperty("data").EnumerateArray(),
+                record => record.GetProperty("id").GetGuid() == recordId);
+
+            using var detailRequest = AuthenticatedGet($"/api/MaintenanceRecords/{recordId}", "Viewer");
+            using var detailResponse = await _client.SendAsync(detailRequest);
+            Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+
+            using var updateRequest = AuthenticatedJsonRequest(
+                HttpMethod.Put,
+                $"/api/MaintenanceRecords/{recordId}",
+                "MaintenanceTechnician",
+                new
+                {
+                    vehicleId,
+                    serviceType = "Updated Integration Service",
+                    description = "Updated through the maintenance API",
+                    scheduledDate = createDate,
+                    completedDate = (DateTime?)null,
+                    cost = 300m,
+                    vendor = "Updated Vendor",
+                    status = "InProgress"
+                });
+            using var updateResponse = await _client.SendAsync(updateRequest);
+            Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+            using var updatedJson = JsonDocument.Parse(await updateResponse.Content.ReadAsStringAsync());
+            Assert.Equal("Updated Integration Service", updatedJson.RootElement.GetProperty("data").GetProperty("serviceType").GetString());
+
+            using var deleteRequest = AuthenticatedRequest(
+                HttpMethod.Delete,
+                $"/api/MaintenanceRecords/{recordId}",
+                "Admin");
+            using var deleteResponse = await _client.SendAsync(deleteRequest);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            using var deletedDetailRequest = AuthenticatedGet($"/api/MaintenanceRecords/{recordId}", "Viewer");
+            using var deletedDetailResponse = await _client.SendAsync(deletedDetailRequest);
+            Assert.Equal(HttpStatusCode.NotFound, deletedDetailResponse.StatusCode);
+        }
+        finally
+        {
+            await DeleteVehicleAsync(vehicleId);
+        }
+    }
+
+    [Fact]
+    public async Task FuelRecordsApi_SupportsCreateListDetailUpdateAndDelete()
+    {
+        await EnsureConfiguredAsync();
+        var vehicleId = await CreateVehicleAsync();
+
+        try
+        {
+            using var createRequest = AuthenticatedJsonRequest(
+                HttpMethod.Post,
+                "/api/FuelRecords",
+                "FleetManager",
+                new
+                {
+                    vehicleId,
+                    fuelDate = DateTime.UtcNow.AddMinutes(-1),
+                    quantity = 55.5m,
+                    cost = 88.25m,
+                    odometerReading = 1325.5m
+                });
+            using var createResponse = await _client!.SendAsync(createRequest);
+
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            using var createdJson = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+            var recordId = createdJson.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+            Assert.Equal(55.5m, createdJson.RootElement.GetProperty("data").GetProperty("quantity").GetDecimal());
+
+            using var listRequest = AuthenticatedGet("/api/FuelRecords", "Viewer");
+            using var listResponse = await _client.SendAsync(listRequest);
+            Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+            using var listJson = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+            Assert.Contains(
+                listJson.RootElement.GetProperty("data").EnumerateArray(),
+                record => record.GetProperty("id").GetGuid() == recordId);
+
+            using var detailRequest = AuthenticatedGet($"/api/FuelRecords/{recordId}", "Viewer");
+            using var detailResponse = await _client.SendAsync(detailRequest);
+            Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+
+            using var updateRequest = AuthenticatedJsonRequest(
+                HttpMethod.Put,
+                $"/api/FuelRecords/{recordId}",
+                "FleetManager",
+                new
+                {
+                    vehicleId,
+                    fuelDate = DateTime.UtcNow.AddMinutes(-1),
+                    quantity = 60m,
+                    cost = 95.75m,
+                    odometerReading = 1400m
+                });
+            using var updateResponse = await _client.SendAsync(updateRequest);
+            Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+            using var updatedJson = JsonDocument.Parse(await updateResponse.Content.ReadAsStringAsync());
+            Assert.Equal(60m, updatedJson.RootElement.GetProperty("data").GetProperty("quantity").GetDecimal());
+
+            using var deleteRequest = AuthenticatedRequest(
+                HttpMethod.Delete,
+                $"/api/FuelRecords/{recordId}",
+                "Admin");
+            using var deleteResponse = await _client.SendAsync(deleteRequest);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            using var deletedDetailRequest = AuthenticatedGet($"/api/FuelRecords/{recordId}", "Viewer");
+            using var deletedDetailResponse = await _client.SendAsync(deletedDetailRequest);
+            Assert.Equal(HttpStatusCode.NotFound, deletedDetailResponse.StatusCode);
+        }
+        finally
+        {
+            await DeleteVehicleAsync(vehicleId);
+        }
+    }
+
+    [Fact]
     public async Task FailedWorkOrderInsert_RollsBackVehicleStatusChange()
     {
         await EnsureConfiguredAsync();
@@ -302,6 +454,22 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer",
             CreateToken(role, $"{role.ToLowerInvariant()}@example.test"));
+        return request;
+    }
+
+    private HttpRequestMessage AuthenticatedRequest(HttpMethod method, string path, string role)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(role, $"{role.ToLowerInvariant()}@example.test"));
+        return request;
+    }
+
+    private HttpRequestMessage AuthenticatedJsonRequest(HttpMethod method, string path, string role, object body)
+    {
+        var request = AuthenticatedRequest(method, path, role);
+        request.Content = JsonContent.Create(body);
         return request;
     }
 
@@ -410,4 +578,9 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         new DbContextOptionsBuilder<FleetDbContext>()
             .UseSqlServer(_connectionString!)
             .Options);
+
+    private sealed class NoOpKafkaProducer : IKafkaProducer
+    {
+        public Task ProduceAsync<T>(string topic, T message) => Task.CompletedTask;
+    }
 }
