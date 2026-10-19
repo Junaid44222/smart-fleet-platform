@@ -275,6 +275,14 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - Existing build advisories remain: the frontend bundle exceeds the configured chunk size guidance and .NET reports existing package vulnerability/version warnings.
 - Commit: completed (`feat(auth): add SuperAdmin user deletion and vehicle status access`).
 
+### SuperAdmin Vehicle Status 403 Follow-up (Complete — 2026-10-20)
+
+- Source and authorization tests confirm the status endpoint allows `Admin,SuperAdmin`.
+- Local diagnosis found FleetService.API still running from 00:45 with binaries older than the authorization change; that stale process held the build outputs open and continued returning 403.
+- Stopped the stale FleetService instance, rebuilt the API from current source, and restarted it. It is listening on port 5081.
+- Live check: the status endpoint through the gateway returns 401 with no token, as expected; backend role-policy tests verify SuperAdmin is authorized.
+- Commit: completed (`docs(tracker): record status policy runtime fix`).
+
 ---
 
 # Completed Tasks
