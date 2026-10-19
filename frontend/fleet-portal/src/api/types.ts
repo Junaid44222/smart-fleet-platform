@@ -56,6 +56,7 @@ export interface DriverTrip {
   fuelConsumed?: number | null;
   status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled' | string;
   vehicle?: Pick<Vehicle, 'manufacturer' | 'model' | 'vehicleNumber' | 'year'> | null;
+  driver?: Pick<Driver, 'firstName' | 'lastName' | 'employeeCode' | 'email'> | null;
 }
 
 export interface VehicleAssignment {

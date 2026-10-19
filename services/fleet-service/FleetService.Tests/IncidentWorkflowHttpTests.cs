@@ -493,6 +493,47 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task TripScheduleCanBeEditedAndSoftDeletedWithAdministratorOnlyDeletion()
+    {
+        await EnsureConfiguredAsync();
+        var tripRecord = await CreateDriverTripAsync("trip-crud-driver@example.test");
+
+        try
+        {
+            var startDate = DateTime.UtcNow.AddDays(2);
+            using var update = AuthenticatedJsonRequest(HttpMethod.Put, $"/api/Trips/{tripRecord.TripId}", "Dispatcher", new
+            {
+                vehicleId = tripRecord.VehicleId,
+                driverId = tripRecord.DriverId,
+                source = "Updated pickup",
+                destination = "Updated dropoff",
+                startDate,
+                endDate = startDate.AddHours(3)
+            });
+            using var updateResponse = await _client!.SendAsync(update);
+            Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+            using var forbiddenDelete = AuthenticatedRequest(HttpMethod.Delete, $"/api/Trips/{tripRecord.TripId}", "Dispatcher");
+            using var forbiddenDeleteResponse = await _client.SendAsync(forbiddenDelete);
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenDeleteResponse.StatusCode);
+
+            using var delete = AuthenticatedRequest(HttpMethod.Delete, $"/api/Trips/{tripRecord.TripId}", "Admin");
+            using var deleteResponse = await _client.SendAsync(delete);
+            Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+            await using var context = CreateContext();
+            var trip = await context.Trips.AsNoTracking().SingleAsync(item => item.Id == tripRecord.TripId);
+            Assert.True(trip.IsDeleted);
+            Assert.Equal("Updated pickup", trip.Source);
+            Assert.Equal("Updated dropoff", trip.Destination);
+        }
+        finally
+        {
+            await DeleteDriverTripAsync(tripRecord);
+        }
+    }
+
     private async Task EnsureConfiguredAsync()
     {
         if (string.IsNullOrWhiteSpace(_connectionString))

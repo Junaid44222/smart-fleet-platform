@@ -81,6 +81,55 @@ public class Trip
         Touch(cancelledAt, changedBy);
     }
 
+    public void UpdateSchedule(
+        Guid vehicleId,
+        Guid driverId,
+        string source,
+        string destination,
+        DateTime startDate,
+        DateTime endDate,
+        DateTime changedAt,
+        string changedBy)
+    {
+        EnsureStatus(ScheduledStatus, "Only scheduled trips can be updated.");
+        if (vehicleId == Guid.Empty || driverId == Guid.Empty)
+        {
+            throw new ArgumentException("A vehicle and driver are required for a trip.");
+        }
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(destination))
+        {
+            throw new ArgumentException("A source and destination are required for a trip.");
+        }
+        if (source.Trim().Length > 500 || destination.Trim().Length > 500)
+        {
+            throw new ArgumentException("Trip locations cannot exceed 500 characters.");
+        }
+        if (startDate >= endDate)
+        {
+            throw new ArgumentException("The trip end date must be after its start date.");
+        }
+
+        VehicleId = vehicleId;
+        DriverId = driverId;
+        Source = source.Trim();
+        Destination = destination.Trim();
+        StartDate = startDate;
+        EndDate = endDate;
+        Touch(changedAt, changedBy);
+    }
+
+    public void SoftDelete(DateTime deletedAt, string changedBy)
+    {
+        if (!string.Equals(Status, ScheduledStatus, StringComparison.Ordinal) &&
+            !string.Equals(Status, CancelledStatus, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Only scheduled or cancelled trips can be deleted.");
+        }
+
+        IsDeleted = true;
+        Touch(deletedAt, changedBy);
+    }
+
     private void EnsureStatus(string expected, string message)
     {
         if (!string.Equals(Status, expected, StringComparison.Ordinal))

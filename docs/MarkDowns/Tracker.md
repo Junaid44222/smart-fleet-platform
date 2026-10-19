@@ -719,17 +719,21 @@ Estimated:
 ## Trip Management Module
 
 Status:
-Not Started
+Completed (2026-10-20)
 
 Priority:
 Medium
 
 Tasks:
 
-* [ ] Create Trip entity and migration
-* [ ] Create Trip CRUD APIs
-* [ ] Publish Trip Kafka events
-* [ ] Build Trip UI (manager + driver)
+* [x] Create Trip entity and migration
+* [x] Complete Trip CRUD APIs (list/detail/create/update/soft-delete/start/complete/cancel)
+* [x] Publish Trip Kafka events
+* [x] Build Trip UI (manager + driver)
+
+Implementation (2026-10-20): added manager trip scheduling, assignment, update, lifecycle actions, and administrator-only soft delete. Added `trip-updated` and `trip-deleted` Kafka events. The driver mobile experience supports driver-scoped trip reads and start/complete actions.
+
+Verification: frontend production build and lint passed; frontend permission matrix passed (9/9); FleetService non-database suite passed (65/65). SQL-backed HTTP regression tests cover trip ownership and manager update/delete behavior but could not run because the configured SQL Server database is unavailable. Existing package advisories and frontend chunk-size guidance remain.
 
 ---
 

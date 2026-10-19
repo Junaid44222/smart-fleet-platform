@@ -12,6 +12,9 @@ import {
   canDeleteMaintenance,
   canDeleteVehicle,
   canDeleteUsers,
+  canCreateTrip,
+  canUpdateTrip,
+  canDeleteTrip,
   canManageFuel,
   canManageMaintenance,
   canManageUsers,
@@ -22,14 +25,14 @@ import {
 } from './rolePermissions.ts';
 
 const rolePermissions = {
-  Admin: [...Array(17).fill(true), false],
-  SuperAdmin: Array(18).fill(true),
-  FleetManager: [false, true, true, false, true, true, false, true, true, true, false, true, true, true, false, true, false, false],
-  Dispatcher: [false, false, false, false, false, false, false, true, ...Array(10).fill(false)],
-  MaintenanceTechnician: [false, false, false, false, false, false, false, false, true, true, false, true, false, false, false, false, false, false],
-  SafetyOfficer: Array(18).fill(false),
-  Viewer: Array(18).fill(false),
-  Driver: Array(18).fill(false),
+  Admin: [...Array(17).fill(true), false, true, true, true],
+  SuperAdmin: Array(21).fill(true),
+  FleetManager: [false, true, true, false, true, true, false, true, true, true, false, true, true, true, false, true, false, false, true, true, false],
+  Dispatcher: [false, false, false, false, false, false, false, true, ...Array(10).fill(false), true, true, false],
+  MaintenanceTechnician: [false, false, false, false, false, false, false, false, true, true, false, true, false, false, false, false, false, false, false, false, false],
+  SafetyOfficer: Array(21).fill(false),
+  Viewer: Array(21).fill(false),
+  Driver: Array(21).fill(false),
 };
 
 const checks = [
@@ -51,6 +54,9 @@ const checks = [
   canManageFuel,
   canManageUsers,
   canDeleteUsers,
+  canCreateTrip,
+  canUpdateTrip,
+  canDeleteTrip,
 ];
 
 for (const [role, expected] of Object.entries(rolePermissions)) {

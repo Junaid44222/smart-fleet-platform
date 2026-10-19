@@ -135,6 +135,91 @@ public sealed class TripService : ITripService
         return trip;
     }
 
+    public async Task<Trip?> UpdateAsync(
+        Guid id,
+        CreateTripDto request,
+        string changedBy,
+        CancellationToken cancellationToken)
+    {
+        var trip = await _context.Trips
+            .Include(item => item.Vehicle)
+            .FirstOrDefaultAsync(
+            item => item.Id == id && !item.IsDeleted,
+            cancellationToken);
+        if (trip is null) return null;
+
+        var vehicle = await _context.Vehicles.SingleOrDefaultAsync(
+            item => item.Id == request.VehicleId,
+            cancellationToken);
+        if (vehicle is null) throw new KeyNotFoundException("Vehicle not found.");
+        if (!string.Equals(vehicle.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only active vehicles can be scheduled for a trip.");
+        }
+
+        var driver = await _context.Drivers.SingleOrDefaultAsync(
+            item => item.Id == request.DriverId && !item.IsDeleted,
+            cancellationToken);
+        if (driver is null) throw new KeyNotFoundException("Driver not found.");
+        if (!string.Equals(driver.Status, "Active", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(driver.Status, "Assigned", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only active drivers can be scheduled for a trip.");
+        }
+
+        var currentAssignment = await _context.VehicleAssignments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(assignment =>
+                assignment.DriverId == request.DriverId && assignment.ReleasedDate == null,
+                cancellationToken);
+        if (currentAssignment is not null && currentAssignment.VehicleId != request.VehicleId)
+        {
+            throw new InvalidOperationException("The driver is assigned to a different vehicle.");
+        }
+
+        trip.UpdateSchedule(
+            request.VehicleId,
+            request.DriverId,
+            request.Source,
+            request.Destination,
+            request.StartDate,
+            request.EndDate,
+            DateTime.UtcNow,
+            changedBy);
+        await _context.SaveChangesAsync(cancellationToken);
+        await _producer.ProduceAsync("trip-updated", new TripUpdatedEvent
+        {
+            Id = trip.Id,
+            TripNumber = trip.TripNumber,
+            VehicleId = trip.VehicleId,
+            DriverId = trip.DriverId,
+            Source = trip.Source,
+            Destination = trip.Destination,
+            StartDate = trip.StartDate,
+            EndDate = trip.EndDate
+        });
+        return trip;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, string changedBy, CancellationToken cancellationToken)
+    {
+        var trip = await _context.Trips.FirstOrDefaultAsync(
+            item => item.Id == id && !item.IsDeleted,
+            cancellationToken);
+        if (trip is null) return false;
+
+        var deletedAt = DateTime.UtcNow;
+        trip.SoftDelete(deletedAt, changedBy);
+        await _context.SaveChangesAsync(cancellationToken);
+        await _producer.ProduceAsync("trip-deleted", new TripDeletedEvent
+        {
+            Id = trip.Id,
+            TripNumber = trip.TripNumber,
+            DeletedAt = deletedAt
+        });
+        return true;
+    }
+
     public async Task<Trip?> StartAsync(Guid id, string changedBy, string? driverEmail, CancellationToken cancellationToken)
     {
         var trip = await GetTrackedTripAsync(id, driverEmail, cancellationToken);

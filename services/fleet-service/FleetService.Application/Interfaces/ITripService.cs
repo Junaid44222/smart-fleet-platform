@@ -15,6 +15,10 @@ public interface ITripService
 
     Task<Trip> CreateAsync(CreateTripDto request, string createdBy, CancellationToken cancellationToken);
 
+    Task<Trip?> UpdateAsync(Guid id, CreateTripDto request, string changedBy, CancellationToken cancellationToken);
+
+    Task<bool> DeleteAsync(Guid id, string changedBy, CancellationToken cancellationToken);
+
     Task<Trip?> StartAsync(Guid id, string changedBy, string? driverEmail, CancellationToken cancellationToken);
 
     Task<Trip?> CompleteAsync(Guid id, CompleteTripDto request, string changedBy, string? driverEmail, CancellationToken cancellationToken);

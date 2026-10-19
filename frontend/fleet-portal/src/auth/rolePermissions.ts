@@ -2,6 +2,7 @@ const administratorRoles = ['Admin', 'SuperAdmin'] as const;
 const fleetManagerRoles = ['Admin', 'SuperAdmin', 'FleetManager'] as const;
 const vehicleAssignerRoles = ['Admin', 'SuperAdmin', 'FleetManager', 'Dispatcher'] as const;
 const maintenanceManagerRoles = ['Admin', 'SuperAdmin', 'FleetManager', 'MaintenanceTechnician'] as const;
+const tripManagerRoles = ['Admin', 'SuperAdmin', 'FleetManager', 'Dispatcher'] as const;
 
 const hasRole = (role: string, allowedRoles: readonly string[]) => allowedRoles.includes(role);
 
@@ -23,3 +24,6 @@ export const canDeleteFuel = (role: string) => hasRole(role, administratorRoles)
 export const canManageFuel = (role: string) => hasRole(role, fleetManagerRoles);
 export const canChangeVehicleStatus = (role: string) => hasRole(role, administratorRoles);
 export const canDeleteUsers = (role: string) => role === 'SuperAdmin';
+export const canCreateTrip = (role: string) => hasRole(role, tripManagerRoles);
+export const canUpdateTrip = (role: string) => hasRole(role, tripManagerRoles);
+export const canDeleteTrip = (role: string) => hasRole(role, administratorRoles);

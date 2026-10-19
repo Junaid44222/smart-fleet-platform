@@ -18,6 +18,7 @@ import AIAssistantPage from './features/ai-assistant/pages/AIAssistantPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
 import UserManagementPage from './features/auth/pages/UserManagementPage';
 import DriverHomePage from './features/driver/pages/DriverHomePage';
+import TripsPage from './features/trips/pages/TripsPage';
 import { canManageUsers } from './auth/rolePermissions';
 
 const AuthenticatedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -46,6 +47,7 @@ const AppContent: React.FC = () => {
       <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />} />
       <Route path="/register" element={!isAuthenticated ? <RegisterPage /> : <Navigate to="/dashboard" />} />
       <Route path="/driver" element={isAuthenticated && isDriver ? <DriverHomePage /> : <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+      <Route path="/trips" element={isAuthenticated && !isDriver ? <AuthenticatedLayout><TripsPage /></AuthenticatedLayout> : <Navigate to={isAuthenticated ? '/driver' : '/login'} replace />} />
       <Route path="/dashboard" element={isAuthenticated ? (isDriver ? <Navigate to="/driver" replace /> : <AuthenticatedLayout><DashboardPage /></AuthenticatedLayout>) : <Navigate to="/login" />} />
       <Route path="/vehicles" element={isAuthenticated ? <AuthenticatedLayout><VehicleListPage /></AuthenticatedLayout> : <Navigate to="/login" />} />
       <Route path="/vehicles/:id" element={isAuthenticated ? <AuthenticatedLayout><VehicleDetailPage /></AuthenticatedLayout> : <Navigate to="/login" />} />

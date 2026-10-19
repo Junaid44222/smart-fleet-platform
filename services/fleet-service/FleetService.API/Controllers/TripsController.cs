@@ -109,6 +109,57 @@ public class TripsController : ControllerBase
         }
     }
 
+    /// <summary>Updates a scheduled trip.</summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = FleetRoles.TripManagers)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateTripDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var trip = await _tripService.UpdateAsync(
+                id,
+                request,
+                User.FindFirst(ClaimTypes.Email)?.Value ?? "system",
+                cancellationToken);
+            return trip is null
+                ? NotFound(new ApiResponse<object> { Success = false, Message = "Trip not found" })
+                : Ok(new ApiResponse<object> { Success = true, Message = "Trip updated successfully", Data = trip });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+    }
+
+    /// <summary>Soft-deletes a scheduled or cancelled trip.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = FleetRoles.Administrators)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await _tripService.DeleteAsync(
+                id,
+                User.FindFirst(ClaimTypes.Email)?.Value ?? "system",
+                cancellationToken);
+            return deleted
+                ? Ok(new ApiResponse<object> { Success = true, Message = "Trip deleted successfully" })
+                : NotFound(new ApiResponse<object> { Success = false, Message = "Trip not found" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ApiResponse<object> { Success = false, Message = ex.Message });
+        }
+    }
+
     /// <summary>Starts a scheduled trip.</summary>
     [HttpPost("{id:guid}/start")]
     [Authorize(Roles = FleetRoles.TripOperators)]

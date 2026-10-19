@@ -66,7 +66,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Vehicles', path: '/vehicles', icon: <VehiclesIcon /> },
   { label: 'Drivers', path: '/drivers', icon: <DriversIcon /> },
-  { label: 'Trips', path: '/trips', icon: <TripsIcon />, disabled: true },
+  { label: 'Trips', path: '/trips', icon: <TripsIcon /> },
   { label: 'Maintenance', path: '/maintenance', icon: <MaintenanceIcon /> },
   { label: 'Fuel', path: '/fuel', icon: <FuelIcon /> },
   { label: 'Analytics', path: '/analytics', icon: <AnalyticsIcon />, disabled: true },
@@ -195,9 +195,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const safetyScore = notificationsData?.stats.safetyScore ?? 100;
   const notificationCount = maintenanceDueCount + (safetyScore < 80 ? 1 : 0);
   const userCanManageUsers = canManageUsers(userRole);
-  const visibleNavItems: NavItem[] = userCanManageUsers
-    ? [...navItems, { label: 'User Management', path: '/users', icon: <ManageAccountsIcon /> }]
-    : navItems;
+  const visibleNavItems: NavItem[] = navItems.filter((item) => item.path !== '/trips' || userRole !== 'Driver');
+  if (userCanManageUsers) visibleNavItems.push({ label: 'User Management', path: '/users', icon: <ManageAccountsIcon /> });
 
   useEffect(() => {
     void fetchDashboardStats()

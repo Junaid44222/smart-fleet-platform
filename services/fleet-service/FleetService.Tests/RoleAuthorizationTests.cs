@@ -27,6 +27,8 @@ public class RoleAuthorizationTests
     [InlineData(typeof(VehiclesController), "Delete", FleetRoles.Administrators)]
     [InlineData(typeof(VehiclesController), "SetAssignment", FleetRoles.VehicleAssigners)]
     [InlineData(typeof(TripsController), "Create", FleetRoles.TripManagers)]
+    [InlineData(typeof(TripsController), "Update", FleetRoles.TripManagers)]
+    [InlineData(typeof(TripsController), "Delete", FleetRoles.Administrators)]
     [InlineData(typeof(TripsController), "Start", FleetRoles.TripOperators)]
     [InlineData(typeof(TripsController), "Complete", FleetRoles.TripOperators)]
     [InlineData(typeof(TripsController), "Cancel", FleetRoles.TripManagers)]

@@ -6,6 +6,35 @@ export const fetchDriverTrips = async () => {
   return response.data.data ?? [];
 };
 
+export const fetchTrips = async () => {
+  const response = await apiClient.get<ApiResponse<DriverTrip[]>>('/fleet/Trips');
+  return response.data.data ?? [];
+};
+
+export type TripScheduleInput = Pick<DriverTrip, 'vehicleId' | 'driverId' | 'source' | 'destination' | 'startDate' | 'endDate'>;
+
+export const createTrip = async (trip: TripScheduleInput) => {
+  const response = await apiClient.post<ApiResponse<DriverTrip>>('/fleet/Trips', trip);
+  if (!response.data.data) throw new Error(response.data.message || 'Unable to schedule trip.');
+  return response.data.data;
+};
+
+export const updateTrip = async (tripId: string, trip: TripScheduleInput) => {
+  const response = await apiClient.put<ApiResponse<DriverTrip>>(`/fleet/Trips/${tripId}`, trip);
+  if (!response.data.data) throw new Error(response.data.message || 'Unable to update trip.');
+  return response.data.data;
+};
+
+export const deleteTrip = async (tripId: string) => {
+  await apiClient.delete<ApiResponse<null>>(`/fleet/Trips/${tripId}`);
+};
+
+export const cancelTrip = async (tripId: string) => {
+  const response = await apiClient.post<ApiResponse<DriverTrip>>(`/fleet/Trips/${tripId}/cancel`);
+  if (!response.data.data) throw new Error(response.data.message || 'Unable to cancel trip.');
+  return response.data.data;
+};
+
 export const startDriverTrip = async (tripId: string) => {
   const response = await apiClient.post<ApiResponse<DriverTrip>>(`/fleet/Trips/${tripId}/start`);
   if (!response.data.data) throw new Error(response.data.message || 'Unable to start trip.');
