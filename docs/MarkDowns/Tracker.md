@@ -684,13 +684,18 @@ Estimated:
 ### Backend Gaps
 
 Status:
-In Progress
+Completed
 
 Tasks:
 
 * [x] Trip module (entity, API, events)
 * [x] Fleet Service health checks (`/health`, `/health/ready`)
-* [ ] Phase 1 stabilization (centralized config, correlation ID logging)
+* [x] Phase 1 stabilization (centralized config, correlation ID logging)
+  * [x] Add a shared configuration defaults provider with environment variable overrides.
+  * [x] Add request correlation ID middleware to active APIs and the gateway.
+  * [x] Verify correlation ID behavior and service builds/tests.
+
+Verification: all solution projects build successfully; all 55 non-database FleetService tests pass. The 10 `IncidentWorkflowHttpTests` require `FLEET_TEST_CONNECTION_STRING` and were not runnable without a configured test database.
 
 Estimated:
 2-4 Days

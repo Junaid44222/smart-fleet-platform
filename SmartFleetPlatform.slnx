@@ -4,6 +4,9 @@
     <Project Path="gateway/SmartFleet.Gateway/SmartFleet.Gateway.csproj" />
   </Folder>
   <Folder Name="/services/" />
+  <Folder Name="/shared/">
+    <Project Path="shared/SmartFleet.Common/SmartFleet.Common.csproj" />
+  </Folder>
   <Folder Name="/services/fleet-service/">
     <Project Path="services/fleet-service/FleetService.API/FleetService.API.csproj" />
     <Project Path="services/fleet-service/FleetService.Application/FleetService.Application.csproj" />

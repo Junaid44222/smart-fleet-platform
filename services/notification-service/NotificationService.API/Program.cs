@@ -4,10 +4,14 @@ using NotificationService.Infrastructure.Messaging;
 using NotificationService.Infrastructure.Messaging.Interfaces;
 using NotificationService.Infrastructure.Services;
 using NotificationService.Domain.Port;
+using SmartFleet.Common.Configuration;
+using SmartFleet.Common.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddSmartFleetSharedConfiguration(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSmartFleetDiagnostics(builder.Configuration);
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -43,6 +47,7 @@ builder.Services.AddSingleton<NotificationDispatcher>();
 builder.Services.AddHostedService<NotificationConsumerService>();
 
 var app = builder.Build();
+app.UseCorrelationId();
 
 if (app.Environment.IsDevelopment())
 {

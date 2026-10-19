@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\shared\SmartFleet.Common\SmartFleet.Common.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
     <PackageReference Include="Ocelot" Version="24.1.0" />
   </ItemGroup>

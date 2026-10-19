@@ -8,10 +8,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using SmartFleet.Common.Configuration;
+using SmartFleet.Common.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddSmartFleetSharedConfiguration(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSmartFleetDiagnostics(builder.Configuration);
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -104,6 +108,7 @@ builder.Services.AddAuthentication(
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+app.UseCorrelationId();
 
 app.MigrateAndSeedDatabase();
 

@@ -17,16 +17,20 @@ using Microsoft.OpenApi.Models;
 using FleetService.API.Extensions;
 using FleetService.API.HealthChecks;
 using FleetService.API.Middleware;
+using SmartFleet.Common.Configuration;
+using SmartFleet.Common.Diagnostics;
 using Serilog;
 
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddSmartFleetSharedConfiguration(args);
 
 // =========================================
 // Serilog
 // =========================================
 Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
     .WriteTo.Console()
     .CreateLogger();
 
@@ -36,6 +40,7 @@ builder.Host.UseSerilog();
 // Controllers
 // =========================================
 builder.Services.AddControllers();
+builder.Services.AddSmartFleetDiagnostics(builder.Configuration);
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"], timeout: TimeSpan.FromSeconds(5));
 
@@ -179,6 +184,8 @@ app.MigrateAndSeedDatabase();
 // =========================================
 // Middleware
 // =========================================
+app.UseCorrelationId();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
