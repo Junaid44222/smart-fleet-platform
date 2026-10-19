@@ -4,15 +4,18 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using FleetService.API.Authorization;
 using FleetService.API.Controllers;
 using FleetService.API.Middleware;
 using FleetService.Application.Features.Vehicles.Commands;
 using FleetService.Application.Interfaces;
+using FleetService.Application.Services;
 using FleetService.Domain.Entities;
 using FleetService.Infrastructure.Messaging;
 using FleetService.Infrastructure.Messaging.Interfaces;
 using FleetService.Infrastructure.Persistence;
+using FleetService.Infrastructure.Repositories;
 using FleetService.Infrastructure.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -57,6 +60,11 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
             options.RegisterServicesFromAssembly(typeof(CreateVehicleCommand).Assembly));
         builder.Services.AddScoped<IAdministrativeVehicleService, AdministrativeVehicleService>();
         builder.Services.AddScoped<IVehicleAssignmentService, VehicleAssignmentService>();
+        builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
+        builder.Services.AddScoped<IMaintenanceRecordRepository, MaintenanceRecordRepository>();
+        builder.Services.AddScoped<IMaintenanceRecordService, MaintenanceRecordService>();
+        builder.Services.AddScoped<IFuelRecordRepository, FuelRecordRepository>();
+        builder.Services.AddScoped<IFuelRecordService, FuelRecordService>();
         builder.Services.AddSingleton<IKafkaProducer, KafkaProducerService>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -162,6 +170,83 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("MaintenanceRecords")]
+    [InlineData("FuelRecords")]
+    public async Task RecordDetailEndpoints_RequireAuthentication(string route)
+    {
+        await EnsureConfiguredAsync();
+        using var response = await _client!.GetAsync($"/api/{route}/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MaintenanceDetailEndpoint_ReturnsPersistedRecordForViewer()
+    {
+        await EnsureConfiguredAsync();
+        var vehicleId = await CreateVehicleAsync();
+        var recordId = await CreateMaintenanceRecordAsync(vehicleId);
+
+        try
+        {
+            using var request = AuthenticatedGet($"/api/MaintenanceRecords/{recordId}", "Viewer");
+            using var response = await _client!.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Assert.Equal(recordId.ToString(), json.RootElement.GetProperty("data").GetProperty("id").GetString());
+            Assert.Equal("Scheduled Service", json.RootElement.GetProperty("data").GetProperty("serviceType").GetString());
+        }
+        finally
+        {
+            await DeleteVehicleAsync(vehicleId);
+        }
+    }
+
+    [Fact]
+    public async Task MissingMaintenanceDetailEndpoint_ReturnsNotFound()
+    {
+        await EnsureConfiguredAsync();
+        using var request = AuthenticatedGet($"/api/MaintenanceRecords/{Guid.NewGuid()}", "Viewer");
+        using var response = await _client!.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FuelDetailEndpoint_ReturnsPersistedRecordForViewer()
+    {
+        await EnsureConfiguredAsync();
+        var vehicleId = await CreateVehicleAsync();
+        var recordId = await CreateFuelRecordAsync(vehicleId);
+
+        try
+        {
+            using var request = AuthenticatedGet($"/api/FuelRecords/{recordId}", "Viewer");
+            using var response = await _client!.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Assert.Equal(recordId.ToString(), json.RootElement.GetProperty("data").GetProperty("id").GetString());
+            Assert.Equal(42.5m, json.RootElement.GetProperty("data").GetProperty("quantity").GetDecimal());
+        }
+        finally
+        {
+            await DeleteVehicleAsync(vehicleId);
+        }
+    }
+
+    [Fact]
+    public async Task MissingFuelDetailEndpoint_ReturnsNotFound()
+    {
+        await EnsureConfiguredAsync();
+        using var request = AuthenticatedGet($"/api/FuelRecords/{Guid.NewGuid()}", "Viewer");
+        using var response = await _client!.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task FailedWorkOrderInsert_RollsBackVehicleStatusChange()
     {
@@ -211,6 +296,15 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         return request;
     }
 
+    private HttpRequestMessage AuthenticatedGet(string path, string role)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(role, $"{role.ToLowerInvariant()}@example.test"));
+        return request;
+    }
+
     private static HttpRequestMessage StatusRequest(Guid vehicleId) => new(
         HttpMethod.Put,
         $"/api/Vehicles/{vehicleId}/status")
@@ -255,6 +349,44 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         return id;
     }
 
+    private async Task<Guid> CreateMaintenanceRecordAsync(Guid vehicleId)
+    {
+        var id = Guid.NewGuid();
+        await using var context = CreateContext();
+        context.MaintenanceRecords.Add(new MaintenanceRecord
+        {
+            Id = id,
+            VehicleId = vehicleId,
+            ServiceType = "Scheduled Service",
+            Description = "Integration-test maintenance detail",
+            ScheduledDate = DateTime.UtcNow.Date,
+            Cost = 125,
+            Vendor = "Test Vendor",
+            Status = "Scheduled",
+            CreatedBy = "integration-test"
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<Guid> CreateFuelRecordAsync(Guid vehicleId)
+    {
+        var id = Guid.NewGuid();
+        await using var context = CreateContext();
+        context.FuelRecords.Add(new FuelRecord
+        {
+            Id = id,
+            VehicleId = vehicleId,
+            FuelDate = DateTime.UtcNow,
+            Quantity = 42.5m,
+            Cost = 68.25m,
+            OdometerReading = 1200,
+            CreatedBy = "integration-test"
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
     private async Task DeleteVehicleAsync(Guid vehicleId)
     {
         await using var context = CreateContext();
@@ -262,6 +394,10 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
             .Where(record => record.VehicleId == vehicleId)
             .ToListAsync();
         context.MaintenanceRecords.RemoveRange(workOrders);
+        var fuelRecords = await context.FuelRecords
+            .Where(record => record.VehicleId == vehicleId)
+            .ToListAsync();
+        context.FuelRecords.RemoveRange(fuelRecords);
         var vehicle = await context.Vehicles.SingleOrDefaultAsync(item => item.Id == vehicleId);
         if (vehicle is not null)
         {

@@ -30,6 +30,7 @@ import { useSelector } from 'react-redux';
 import PageHeader from '../../../components/PageHeader';
 import { changeVehicleStatus, fetchVehicleAssignment, fetchVehicleById, fetchDrivers, setVehicleAssignment } from '../../../api/fleetApi';
 import type { Driver, Vehicle } from '../../../api/types';
+import { canAssignVehicleDriver, canChangeVehicleStatus } from '../../../auth/rolePermissions';
 
 const VehicleDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -113,8 +114,8 @@ const VehicleDetailPage: React.FC = () => {
   }, [assignedDriverId, drivers]);
 
   const navigate = useNavigate();
-  const canManageVehicleStatus = userRole === 'Admin';
-  const canAssignDriver = ['Admin', 'SuperAdmin', 'FleetManager', 'Dispatcher'].includes(userRole);
+  const userCanManageVehicleStatus = canChangeVehicleStatus(userRole);
+  const userCanAssignDriver = canAssignVehicleDriver(userRole);
 
   const handleAssignmentSave = async () => {
     if (!id) return;
@@ -198,7 +199,7 @@ const VehicleDetailPage: React.FC = () => {
                     {assignmentLoading ? 'Loading assignment…' : assignedDriver ? `${assignedDriver.firstName} ${assignedDriver.lastName}` : 'No driver assigned to this vehicle.'}
                   </Typography>
                 </Box>
-                {canAssignDriver && (
+                {userCanAssignDriver && (
                   <Button variant="contained" disabled={assignmentLoading} onClick={() => {
                     setSelectedDriverId(assignedDriverId ?? '');
                     setIsAssignOpen(true);
@@ -259,7 +260,7 @@ const VehicleDetailPage: React.FC = () => {
                   </Typography>
                 </Box>
                 <Chip label={vehicle.status} color={vehicle.status.toLowerCase() === 'active' ? 'success' : 'default'} />
-                {canManageVehicleStatus && (
+                {userCanManageVehicleStatus && (
                   <Button variant="outlined" onClick={handleStatusDialogOpen}>
                     Change Status
                   </Button>

@@ -239,7 +239,13 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - The E2E runner now supports authenticated JSON POST requests, per-endpoint timeouts, and response-content assertions.
 - Added fuel-history E2E coverage and removed automatic account creation; authenticated checks now require `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` from the environment.
 - Local E2E run passed all seven required checks, including fuel capacity, maintenance history, fuel history, and unknown registration. It reused the configured existing account and created no new account.
-- Next: add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
+- Next task (Complete, 2026-10-20): add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
+  - [x] Cover maintenance and fuel detail HTTP endpoints, including authorization and not-found behavior.
+  - [x] Audit frontend write actions and hide or disable actions users' roles cannot perform.
+  - [x] Run relevant backend/frontend checks and record results.
+  - Backend HTTP verification: signed-in Viewer can read maintenance/fuel details (200); missing records return 404; anonymous requests return 401.
+  - Frontend role guards now match API policy for vehicle creation, driver creation, vehicle/driver assignment, Admin-only vehicle status changes, and Admin/SuperAdmin user management. The navigation link, route guard, and profile role badge use the same policy helpers.
+  - Validation: FleetService tests 48 passed, 0 failed, 0 skipped; frontend permission matrix 9 passed; `npm.cmd run lint` and `npm.cmd run build` passed. Build retains the existing large-chunk advisory.
 
 ### Incident Workflow HTTP/Database Verification (Complete, 2026-10-20)
 

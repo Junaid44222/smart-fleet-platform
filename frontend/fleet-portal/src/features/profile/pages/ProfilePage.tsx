@@ -1,11 +1,14 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { Box, Card, CardContent, Chip, Divider, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AccountCircle, Email, Phone, Shield } from '@mui/icons-material';
 import PageHeader from '../../../components/PageHeader';
+import { canManageUsers } from '../../../auth/rolePermissions';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const { userName, userRole } = useSelector((state: { auth: { userName: string; userRole: string } }) => state.auth);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -21,13 +24,13 @@ const ProfilePage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <AccountCircle sx={{ fontSize: 52, color: 'primary.main' }} />
             <Box>
-              <Typography variant="h3">Fleet Manager</Typography>
+              <Typography variant="h3">{userName || 'Fleet user'}</Typography>
               <Typography variant="body2" color="text.secondary">
-                Operations lead • Smart Fleet Platform
+                {userRole} • Smart Fleet Platform
               </Typography>
             </Box>
           </Box>
-          <Chip label="Admin access" color="success" />
+          <Chip label={userRole} color={canManageUsers(userRole) ? 'success' : 'default'} />
         </Box>
 
         <Divider />

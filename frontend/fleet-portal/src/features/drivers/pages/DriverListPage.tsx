@@ -19,6 +19,7 @@ import {
 import PageHeader from '../../../components/PageHeader';
 import { fetchDrivers, createDriver } from '../../../api/fleetApi';
 import type { Driver } from '../../../api/types';
+import { canCreateDriver } from '../../../auth/rolePermissions';
 
 type ApiError = {
   response?: {
@@ -31,6 +32,7 @@ type ApiError = {
 const DriverListPage: React.FC = () => {
   const navigate = useNavigate();
   const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
+  const userCanCreateDriver = canCreateDriver(userRole);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -70,6 +72,7 @@ const DriverListPage: React.FC = () => {
   }, []);
 
   const handleOpenAddDialog = () => {
+    if (!userCanCreateDriver) return;
     setFormError('');
     setNewDriver({
       employeeCode: '',
@@ -148,7 +151,7 @@ const DriverListPage: React.FC = () => {
         subtitle="Browse current drivers and view profiles."
         onBack={() => navigate(-1)}
         action={
-          userRole === 'Admin' ? (
+          userCanCreateDriver ? (
             <Button variant="contained" color="primary" onClick={handleOpenAddDialog}>
               Add Driver
             </Button>

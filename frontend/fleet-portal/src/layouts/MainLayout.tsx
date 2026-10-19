@@ -51,6 +51,7 @@ import {
 } from '@mui/icons-material';
 import { fetchDashboardStats, fetchDrivers, fetchVehicles } from '../api/fleetApi';
 import type { DashboardOverview, Driver, Vehicle } from '../api/types';
+import { canManageUsers } from '../auth/rolePermissions';
 import { setAuthToken } from '../api/apiClient';
 import { logout } from '../features/auth/authSlice';
 
@@ -193,8 +194,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const maintenanceDueCount = notificationsData?.stats.maintenanceDueCount ?? 0;
   const safetyScore = notificationsData?.stats.safetyScore ?? 100;
   const notificationCount = maintenanceDueCount + (safetyScore < 80 ? 1 : 0);
-  const canManageUsers = ['Admin', 'SuperAdmin'].includes(userRole);
-  const visibleNavItems: NavItem[] = canManageUsers
+  const userCanManageUsers = canManageUsers(userRole);
+  const visibleNavItems: NavItem[] = userCanManageUsers
     ? [...navItems, { label: 'User Management', path: '/users', icon: <ManageAccountsIcon /> }]
     : navItems;
 

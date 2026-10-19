@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -21,6 +22,7 @@ import PageHeader from '../../../components/PageHeader';
 import FilterBar from '../../../components/FilterBar';
 import DataTable from '../../../components/DataTable';
 import StatusBadge from '../../../components/StatusBadge';
+import { canCreateVehicle } from '../../../auth/rolePermissions';
 
 type ApiError = {
   response?: {
@@ -45,6 +47,8 @@ const toVehicleStatus = (status: string): VehicleStatusBadge => {
 
 const VehicleListPage: React.FC = () => {
   const navigate = useNavigate();
+  const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
+  const userCanCreateVehicle = canCreateVehicle(userRole);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -89,6 +93,7 @@ const VehicleListPage: React.FC = () => {
   }, []);
 
   const handleOpenAddDialog = () => {
+    if (!userCanCreateVehicle) return;
     setNewVehicle({
       vehicleNumber: '',
       manufacturer: '',
@@ -240,7 +245,7 @@ const VehicleListPage: React.FC = () => {
         title="Vehicle Inventory"
         subtitle="Manage and track details of your fleet vehicles"
         onBack={() => navigate(-1)}
-        action={
+        action={userCanCreateVehicle ? (
           <Button
             variant="contained"
             color="primary"
@@ -249,7 +254,7 @@ const VehicleListPage: React.FC = () => {
           >
             Add Vehicle
           </Button>
-        }
+        ) : null}
       />
 
       {error ? (

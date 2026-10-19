@@ -17,6 +17,7 @@ import FuelDashboardPage from './features/fuel/pages/FuelDashboardPage';
 import AIAssistantPage from './features/ai-assistant/pages/AIAssistantPage';
 import ProfilePage from './features/profile/pages/ProfilePage';
 import UserManagementPage from './features/auth/pages/UserManagementPage';
+import { canManageUsers } from './auth/rolePermissions';
 
 const AuthenticatedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userName, userRole } = useSelector((state: { auth: { userName: string; userRole: string } }) => state.auth);
@@ -36,7 +37,7 @@ const AuthenticatedLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, userRole } = useSelector((state: { auth: { isAuthenticated: boolean; userRole: string } }) => state.auth);
-  const canManageUsers = ['Admin', 'SuperAdmin'].includes(userRole);
+  const userCanManageUsers = canManageUsers(userRole);
 
   return (
     <Routes>
@@ -51,7 +52,7 @@ const AppContent: React.FC = () => {
       <Route path="/fuel" element={isAuthenticated ? <AuthenticatedLayout><FuelDashboardPage /></AuthenticatedLayout> : <Navigate to="/login" />} />
       <Route path="/ai-assistant" element={isAuthenticated ? <AuthenticatedLayout><AIAssistantPage /></AuthenticatedLayout> : <Navigate to="/login" />} />
       <Route path="/profile" element={isAuthenticated ? <AuthenticatedLayout><ProfilePage /></AuthenticatedLayout> : <Navigate to="/login" />} />
-      <Route path="/users" element={isAuthenticated && canManageUsers ? <AuthenticatedLayout><UserManagementPage /></AuthenticatedLayout> : <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+      <Route path="/users" element={isAuthenticated && userCanManageUsers ? <AuthenticatedLayout><UserManagementPage /></AuthenticatedLayout> : <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );
