@@ -65,6 +65,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         builder.Services.AddScoped<IMaintenanceRecordService, MaintenanceRecordService>();
         builder.Services.AddScoped<IFuelRecordRepository, FuelRecordRepository>();
         builder.Services.AddScoped<IFuelRecordService, FuelRecordService>();
+        builder.Services.AddScoped<ITripService, TripService>();
         builder.Services.AddSingleton<IKafkaProducer, NoOpKafkaProducer>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -425,6 +426,73 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task DriverTripReads_ReturnOnlyTripsAssignedToAuthenticatedDriver()
+    {
+        await EnsureConfiguredAsync();
+        var ownTrip = await CreateDriverTripAsync("driver-one@example.test");
+        var otherTrip = await CreateDriverTripAsync("driver-two@example.test");
+
+        try
+        {
+            using var request = AuthenticatedGet("/api/Trips/mine", "Driver", "driver-one@example.test");
+            using var response = await _client!.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var trips = json.RootElement.GetProperty("data").EnumerateArray().ToArray();
+            Assert.Single(trips);
+            Assert.Equal(ownTrip.TripId.ToString(), trips[0].GetProperty("id").GetString());
+
+            using var otherTripRequest = AuthenticatedGet($"/api/Trips/{otherTrip.TripId}", "Driver", "driver-one@example.test");
+            using var otherTripResponse = await _client.SendAsync(otherTripRequest);
+            Assert.Equal(HttpStatusCode.NotFound, otherTripResponse.StatusCode);
+        }
+        finally
+        {
+            await DeleteDriverTripAsync(ownTrip);
+            await DeleteDriverTripAsync(otherTrip);
+        }
+    }
+
+    [Fact]
+    public async Task DriverCanStartAndCompleteOnlyTheirAssignedTrip()
+    {
+        await EnsureConfiguredAsync();
+        var ownTrip = await CreateDriverTripAsync("driver-one@example.test");
+        var otherTrip = await CreateDriverTripAsync("driver-two@example.test");
+
+        try
+        {
+            using var otherStart = AuthenticatedRequest(HttpMethod.Post, $"/api/Trips/{otherTrip.TripId}/start", "Driver", "driver-one@example.test");
+            using var otherStartResponse = await _client!.SendAsync(otherStart);
+            Assert.Equal(HttpStatusCode.NotFound, otherStartResponse.StatusCode);
+
+            using var start = AuthenticatedRequest(HttpMethod.Post, $"/api/Trips/{ownTrip.TripId}/start", "Driver", "driver-one@example.test");
+            using var startResponse = await _client.SendAsync(start);
+            Assert.Equal(HttpStatusCode.OK, startResponse.StatusCode);
+
+            using var complete = AuthenticatedJsonRequest(HttpMethod.Post, $"/api/Trips/{ownTrip.TripId}/complete", "Driver", new
+            {
+                distance = 42.5m,
+                fuelConsumed = 6.25m
+            }, "driver-one@example.test");
+            using var completeResponse = await _client.SendAsync(complete);
+            Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
+
+            await using var context = CreateContext();
+            var trip = await context.Trips.AsNoTracking().SingleAsync(item => item.Id == ownTrip.TripId);
+            Assert.Equal(Trip.CompletedStatus, trip.Status);
+            Assert.Equal(42.5m, trip.Distance);
+            Assert.Equal(6.25m, trip.FuelConsumed);
+        }
+        finally
+        {
+            await DeleteDriverTripAsync(ownTrip);
+            await DeleteDriverTripAsync(otherTrip);
+        }
+    }
+
     private async Task EnsureConfiguredAsync()
     {
         if (string.IsNullOrWhiteSpace(_connectionString))
@@ -448,29 +516,86 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         return request;
     }
 
-    private HttpRequestMessage AuthenticatedGet(string path, string role)
+    private HttpRequestMessage AuthenticatedGet(string path, string role, string? email = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer",
-            CreateToken(role, $"{role.ToLowerInvariant()}@example.test"));
+            CreateToken(role, email ?? $"{role.ToLowerInvariant()}@example.test"));
         return request;
     }
 
-    private HttpRequestMessage AuthenticatedRequest(HttpMethod method, string path, string role)
+    private HttpRequestMessage AuthenticatedRequest(HttpMethod method, string path, string role, string? email = null)
     {
         var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer",
-            CreateToken(role, $"{role.ToLowerInvariant()}@example.test"));
+            CreateToken(role, email ?? $"{role.ToLowerInvariant()}@example.test"));
         return request;
     }
 
-    private HttpRequestMessage AuthenticatedJsonRequest(HttpMethod method, string path, string role, object body)
+    private HttpRequestMessage AuthenticatedJsonRequest(HttpMethod method, string path, string role, object body, string? email = null)
     {
-        var request = AuthenticatedRequest(method, path, role);
+        var request = AuthenticatedRequest(method, path, role, email);
         request.Content = JsonContent.Create(body);
         return request;
+    }
+
+    private async Task<(Guid TripId, Guid VehicleId, Guid DriverId)> CreateDriverTripAsync(string email)
+    {
+        var vehicleId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        await using var context = CreateContext();
+        context.Vehicles.Add(new Vehicle
+        {
+            Id = vehicleId,
+            VehicleNumber = $"TRIP-TEST-{vehicleId:N}",
+            Manufacturer = "Test",
+            Model = "Driver trip",
+            Year = 2026,
+            FuelCapacity = 100,
+            Status = "Active"
+        });
+        context.Drivers.Add(new Driver
+        {
+            Id = driverId,
+            EmployeeCode = $"DRIVER-{driverId:N}",
+            FirstName = "Test",
+            LastName = "Driver",
+            PhoneNumber = "5550100",
+            Email = email,
+            LicenseNumber = $"LICENSE-{driverId:N}",
+            LicenseExpiryDate = DateTime.UtcNow.AddYears(1),
+            JoiningDate = DateTime.UtcNow.AddYears(-1),
+            Status = "Active"
+        });
+        context.Trips.Add(new Trip
+        {
+            Id = tripId,
+            TripNumber = $"TRIP-TEST-{tripId:N}",
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Source = "Test pickup",
+            Destination = "Test dropoff",
+            StartDate = DateTime.UtcNow.AddHours(1),
+            EndDate = DateTime.UtcNow.AddHours(2),
+            CreatedBy = "fleet-test"
+        });
+        await context.SaveChangesAsync();
+        return (tripId, vehicleId, driverId);
+    }
+
+    private async Task DeleteDriverTripAsync((Guid TripId, Guid VehicleId, Guid DriverId) record)
+    {
+        await using var context = CreateContext();
+        var trip = await context.Trips.FindAsync(record.TripId);
+        if (trip is not null) context.Trips.Remove(trip);
+        var driver = await context.Drivers.FindAsync(record.DriverId);
+        if (driver is not null) context.Drivers.Remove(driver);
+        var vehicle = await context.Vehicles.FindAsync(record.VehicleId);
+        if (vehicle is not null) context.Vehicles.Remove(vehicle);
+        await context.SaveChangesAsync();
     }
 
     private static HttpRequestMessage StatusRequest(Guid vehicleId) => new(

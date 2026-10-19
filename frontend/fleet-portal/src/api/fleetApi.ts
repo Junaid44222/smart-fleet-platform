@@ -1,5 +1,22 @@
 import { apiClient } from './apiClient';
-import type { ApiResponse, DashboardOverview, Driver, FuelRecord, MaintenanceRecord, Vehicle, VehicleAssignment, VehicleStatusChangeResult } from './types';
+import type { ApiResponse, DashboardOverview, Driver, DriverTrip, FuelRecord, MaintenanceRecord, Vehicle, VehicleAssignment, VehicleStatusChangeResult } from './types';
+
+export const fetchDriverTrips = async () => {
+  const response = await apiClient.get<ApiResponse<DriverTrip[]>>('/fleet/Trips/mine');
+  return response.data.data ?? [];
+};
+
+export const startDriverTrip = async (tripId: string) => {
+  const response = await apiClient.post<ApiResponse<DriverTrip>>(`/fleet/Trips/${tripId}/start`);
+  if (!response.data.data) throw new Error(response.data.message || 'Unable to start trip.');
+  return response.data.data;
+};
+
+export const completeDriverTrip = async (tripId: string, distance: number, fuelConsumed: number) => {
+  const response = await apiClient.post<ApiResponse<DriverTrip>>(`/fleet/Trips/${tripId}/complete`, { distance, fuelConsumed });
+  if (!response.data.data) throw new Error(response.data.message || 'Unable to complete trip.');
+  return response.data.data;
+};
 
 export const fetchDashboardStats = async () => {
   const response = await apiClient.get<ApiResponse<DashboardOverview>>('/fleet/Dashboard/stats');

@@ -427,8 +427,10 @@ Status: In Progress
 * [x] AI Assistant UI
 * [x] API contract audit for frontend routes
 * [ ] Integration testing against live services
-* [ ] Role-based access in UI
-* [ ] Driver mobile app (separate experience)
+* [x] Role-based access in UI
+* [x] Driver mobile app (separate experience)
+
+Role access verification: the router, navigation, and fleet list/detail actions use the shared role policy; `npm.cmd run test:permissions` verifies the full role/action matrix. Live integration verification is partial: AI and gateway health returned HTTP 200, while authenticated Fleet/AI checks could not run because no E2E credentials were configured.
 
 Completion Date:
 2026-07-06
@@ -734,7 +736,7 @@ Tasks:
 ## Driver Mobile Experience
 
 Status:
-Not Started
+Completed (2026-10-20)
 
 Priority:
 Medium
@@ -744,9 +746,13 @@ Design Reference:
 
 Tasks:
 
-* [ ] Separate mobile layout with bottom navigation
-* [ ] Active route card and driver quick actions
-* [ ] Wire to trip APIs when available
+* [x] Separate mobile layout with bottom navigation
+* [x] Active route card and driver quick actions
+* [x] Wire to trip APIs when available
+
+Implementation (2026-10-20): added a Driver-only mobile route with home, trips, and profile navigation; assigned-trip cards; start/complete actions; trip completion metrics; refresh and sign-out actions. Fleet trip reads are scoped by the authenticated email, and drivers can start or complete only their own assigned trips.
+
+Verification: frontend production build and lint passed; frontend permission tests passed (9/9); FleetService non-database suite passed (60/60). Added SQL-backed HTTP tests for driver trip visibility and ownership checks; those two tests could not run because the configured FleetService SQL Server database is unavailable. Existing package advisories and frontend chunk-size guidance remain.
 
 ---
 

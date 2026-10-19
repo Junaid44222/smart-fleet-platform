@@ -33,7 +33,7 @@ const LoginPage: React.FC = () => {
         localStorage.setItem('authUserRole', userRole);
         setAuthToken(token);
         dispatch(login({ userName, userRole }));
-        navigate('/dashboard');
+        navigate(userRole === 'Driver' ? '/driver' : '/dashboard');
       } else {
         setError(response.data.message ?? 'Invalid login attempt');
       }

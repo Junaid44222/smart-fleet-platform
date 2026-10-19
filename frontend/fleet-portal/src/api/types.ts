@@ -41,6 +41,23 @@ export interface Driver {
   isDeleted: boolean;
 }
 
+export interface DriverTrip {
+  id: string;
+  tripNumber: string;
+  vehicleId: string;
+  driverId: string;
+  source: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  actualStartDate?: string | null;
+  actualEndDate?: string | null;
+  distance?: number | null;
+  fuelConsumed?: number | null;
+  status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled' | string;
+  vehicle?: Pick<Vehicle, 'manufacturer' | 'model' | 'vehicleNumber' | 'year'> | null;
+}
+
 export interface VehicleAssignment {
   id: string;
   vehicleId: string;

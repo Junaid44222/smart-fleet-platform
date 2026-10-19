@@ -7,5 +7,6 @@ public static class FleetRoles
     public const string FleetManagers = "Admin,SuperAdmin,FleetManager";
     public const string VehicleAssigners = "Admin,SuperAdmin,FleetManager,Dispatcher";
     public const string TripManagers = "Admin,SuperAdmin,FleetManager,Dispatcher";
+    public const string TripOperators = TripManagers + ",Driver";
     public const string MaintenanceManagers = "Admin,SuperAdmin,FleetManager,MaintenanceTechnician";
 }

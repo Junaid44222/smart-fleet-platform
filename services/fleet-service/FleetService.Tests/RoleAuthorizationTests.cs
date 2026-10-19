@@ -27,8 +27,8 @@ public class RoleAuthorizationTests
     [InlineData(typeof(VehiclesController), "Delete", FleetRoles.Administrators)]
     [InlineData(typeof(VehiclesController), "SetAssignment", FleetRoles.VehicleAssigners)]
     [InlineData(typeof(TripsController), "Create", FleetRoles.TripManagers)]
-    [InlineData(typeof(TripsController), "Start", FleetRoles.TripManagers)]
-    [InlineData(typeof(TripsController), "Complete", FleetRoles.TripManagers)]
+    [InlineData(typeof(TripsController), "Start", FleetRoles.TripOperators)]
+    [InlineData(typeof(TripsController), "Complete", FleetRoles.TripOperators)]
     [InlineData(typeof(TripsController), "Cancel", FleetRoles.TripManagers)]
     [InlineData(typeof(DriversController), "Create", FleetRoles.FleetManagers)]
     [InlineData(typeof(DriversController), "Update", FleetRoles.FleetManagers)]
@@ -60,6 +60,14 @@ public class RoleAuthorizationTests
 
         Assert.All(controllers, controller =>
             Assert.NotNull(controller.GetCustomAttribute<AuthorizeAttribute>()));
+    }
+
+    [Fact]
+    public void DriverTripReadEndpoint_IsRestrictedToDrivers()
+    {
+        var authorization = GetMethodAuthorization<TripsController>("GetMine");
+
+        Assert.Equal("Driver", authorization.Roles);
     }
 
     [Fact]
@@ -115,8 +123,8 @@ public class RoleAuthorizationTests
     [InlineData("FleetManager", true)]
     [InlineData("MaintenanceTechnician", false)]
     [InlineData("Dispatcher", false)]
-    [InlineData("Viewer", false)]
     [InlineData("Driver", false)]
+    [InlineData("Viewer", false)]
     public async Task FleetManagerPolicy_UsesConfiguredRoleSet(string role, bool expected)
     {
         var authorization = CreateAuthorizationService();
@@ -126,6 +134,24 @@ public class RoleAuthorizationTests
             user,
             resource: null,
             new RolesAuthorizationRequirement(FleetRoles.FleetManagers.Split(',')));
+
+        Assert.Equal(expected, result.Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Driver", true)]
+    [InlineData("Dispatcher", true)]
+    [InlineData("FleetManager", true)]
+    [InlineData("Viewer", false)]
+    public async Task TripOperatorPolicy_AllowsDriversAndTripManagers(string role, bool expected)
+    {
+        var authorization = CreateAuthorizationService();
+        var user = CreatePrincipal(role);
+
+        var result = await authorization.AuthorizeAsync(
+            user,
+            resource: null,
+            new RolesAuthorizationRequirement(FleetRoles.TripOperators.Split(',')));
 
         Assert.Equal(expected, result.Succeeded);
     }

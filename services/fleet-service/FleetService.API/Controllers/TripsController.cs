@@ -24,7 +24,11 @@ public class TripsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var trips = await _tripService.GetAllAsync(cancellationToken);
+        var trips = User.IsInRole("Driver")
+            ? await _tripService.GetForDriverAsync(
+                User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty,
+                cancellationToken)
+            : await _tripService.GetAllAsync(cancellationToken);
         return Ok(new ApiResponse<object>
         {
             Success = true,
@@ -33,11 +37,33 @@ public class TripsController : ControllerBase
         });
     }
 
+    /// <summary>Lists only the authenticated driver's trips.</summary>
+    [HttpGet("mine")]
+    [Authorize(Roles = "Driver")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        var email = User.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email)) return Forbid();
+
+        var trips = await _tripService.GetForDriverAsync(email, cancellationToken);
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Driver trips fetched successfully",
+            Data = trips
+        });
+    }
+
     /// <summary>Returns a trip by its identifier.</summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var trip = await _tripService.GetByIdAsync(id, cancellationToken);
+        var trip = User.IsInRole("Driver")
+            ? await _tripService.GetForDriverByIdAsync(
+                id,
+                User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty,
+                cancellationToken)
+            : await _tripService.GetByIdAsync(id, cancellationToken);
         if (trip is null)
         {
             return NotFound(new ApiResponse<object> { Success = false, Message = "Trip not found" });
@@ -85,14 +111,18 @@ public class TripsController : ControllerBase
 
     /// <summary>Starts a scheduled trip.</summary>
     [HttpPost("{id:guid}/start")]
-    [Authorize(Roles = FleetRoles.TripManagers)]
+    [Authorize(Roles = FleetRoles.TripOperators)]
     public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
     {
+        var driverEmail = User.IsInRole("Driver") ? User.FindFirst(ClaimTypes.Email)?.Value : null;
+        if (User.IsInRole("Driver") && string.IsNullOrWhiteSpace(driverEmail)) return Forbid();
+
         try
         {
             var trip = await _tripService.StartAsync(
                 id,
                 User.FindFirst(ClaimTypes.Email)?.Value ?? "system",
+                driverEmail,
                 cancellationToken);
             return trip is null
                 ? NotFound(new ApiResponse<object> { Success = false, Message = "Trip not found" })
@@ -106,18 +136,22 @@ public class TripsController : ControllerBase
 
     /// <summary>Completes an in-progress trip and records distance and fuel use.</summary>
     [HttpPost("{id:guid}/complete")]
-    [Authorize(Roles = FleetRoles.TripManagers)]
+    [Authorize(Roles = FleetRoles.TripOperators)]
     public async Task<IActionResult> Complete(
         Guid id,
         [FromBody] CompleteTripDto request,
         CancellationToken cancellationToken)
     {
+        var driverEmail = User.IsInRole("Driver") ? User.FindFirst(ClaimTypes.Email)?.Value : null;
+        if (User.IsInRole("Driver") && string.IsNullOrWhiteSpace(driverEmail)) return Forbid();
+
         try
         {
             var trip = await _tripService.CompleteAsync(
                 id,
                 request,
                 User.FindFirst(ClaimTypes.Email)?.Value ?? "system",
+                driverEmail,
                 cancellationToken);
             return trip is null
                 ? NotFound(new ApiResponse<object> { Success = false, Message = "Trip not found" })

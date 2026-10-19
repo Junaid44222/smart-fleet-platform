@@ -22,14 +22,31 @@ public sealed class TripService : ITripService
     public async Task<IReadOnlyList<Trip>> GetAllAsync(CancellationToken cancellationToken) =>
         await _context.Trips
             .AsNoTracking()
+            .Include(trip => trip.Vehicle)
             .Where(trip => !trip.IsDeleted)
+            .OrderByDescending(trip => trip.StartDate)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Trip>> GetForDriverAsync(string driverEmail, CancellationToken cancellationToken) =>
+        await _context.Trips
+            .AsNoTracking()
+            .Include(trip => trip.Vehicle)
+            .Where(trip => !trip.IsDeleted && trip.Driver != null && trip.Driver.Email == driverEmail)
             .OrderByDescending(trip => trip.StartDate)
             .ToListAsync(cancellationToken);
 
     public async Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         await _context.Trips
             .AsNoTracking()
+            .Include(trip => trip.Vehicle)
             .FirstOrDefaultAsync(trip => trip.Id == id && !trip.IsDeleted, cancellationToken);
+
+    public async Task<Trip?> GetForDriverByIdAsync(Guid id, string driverEmail, CancellationToken cancellationToken) =>
+        await _context.Trips
+            .AsNoTracking()
+            .Include(trip => trip.Vehicle)
+            .FirstOrDefaultAsync(trip => trip.Id == id && !trip.IsDeleted &&
+                trip.Driver != null && trip.Driver.Email == driverEmail, cancellationToken);
 
     public async Task<Trip> CreateAsync(
         CreateTripDto request,
@@ -118,9 +135,9 @@ public sealed class TripService : ITripService
         return trip;
     }
 
-    public async Task<Trip?> StartAsync(Guid id, string changedBy, CancellationToken cancellationToken)
+    public async Task<Trip?> StartAsync(Guid id, string changedBy, string? driverEmail, CancellationToken cancellationToken)
     {
-        var trip = await GetTrackedTripAsync(id, cancellationToken);
+        var trip = await GetTrackedTripAsync(id, driverEmail, cancellationToken);
         if (trip is null) return null;
 
         var startedAt = DateTime.UtcNow;
@@ -139,9 +156,10 @@ public sealed class TripService : ITripService
         Guid id,
         CompleteTripDto request,
         string changedBy,
+        string? driverEmail,
         CancellationToken cancellationToken)
     {
-        var trip = await GetTrackedTripAsync(id, cancellationToken);
+        var trip = await GetTrackedTripAsync(id, driverEmail, cancellationToken);
         if (trip is null) return null;
 
         var completedAt = DateTime.UtcNow;
@@ -162,7 +180,7 @@ public sealed class TripService : ITripService
 
     public async Task<Trip?> CancelAsync(Guid id, string changedBy, CancellationToken cancellationToken)
     {
-        var trip = await GetTrackedTripAsync(id, cancellationToken);
+        var trip = await GetTrackedTripAsync(id, null, cancellationToken);
         if (trip is null) return null;
 
         var cancelledAt = DateTime.UtcNow;
@@ -179,6 +197,9 @@ public sealed class TripService : ITripService
         return trip;
     }
 
-    private Task<Trip?> GetTrackedTripAsync(Guid id, CancellationToken cancellationToken) =>
-        _context.Trips.FirstOrDefaultAsync(trip => trip.Id == id && !trip.IsDeleted, cancellationToken);
+    private Task<Trip?> GetTrackedTripAsync(Guid id, string? driverEmail, CancellationToken cancellationToken) =>
+        _context.Trips
+            .Include(trip => trip.Vehicle)
+            .FirstOrDefaultAsync(trip => trip.Id == id && !trip.IsDeleted &&
+                (driverEmail == null || (trip.Driver != null && trip.Driver.Email == driverEmail)), cancellationToken);
 }
