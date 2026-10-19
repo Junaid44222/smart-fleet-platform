@@ -179,9 +179,9 @@ Implementation checklist:
 - [x] Add an Admin-only incident operation that marks a vehicle out of service and creates an unplanned work order in one database save.
 - [x] Add Admin UI for status changes and incident maintenance creation.
 - [x] Add regression tests for declared role policies and allow/deny outcomes for Fleet and Identity role requirements.
-- [ ] Verify HTTP allow/deny behavior with signed role tokens and verify incident persistence plus transaction rollback against a database.
+- [x] Verify HTTP allow/deny behavior with signed role tokens and verify incident persistence plus transaction rollback against a database.
 
-Implementation progress (2026-10-18): Identity login returns the stored role, public registration always assigns `Dispatcher`, and Admin/SuperAdmin users can list users and update assignable roles. Fleet write endpoints now require role membership, with the incident/status endpoint restricted to `Admin` only as agreed. The vehicle detail UI exposes status and incident work-order creation to Admin users. IdentityService and FleetService API builds passed; `npm.cmd run build` passed in `frontend/fleet-portal` (with the existing large-chunk advisory). Added `FleetService.Tests`; 25 tests now pass, covering endpoint/controller authorization metadata and ASP.NET role requirement allow/deny outcomes, including proving `SuperAdmin` does not pass the Admin-only incident role requirement. Signed-token HTTP pipeline and database persistence/rollback verification remain outstanding. A compatible SQLite provider is not cached and NuGet network access is unavailable in this environment.
+Implementation progress (2026-10-18): Identity login returns the stored role, public registration always assigns `Dispatcher`, and Admin/SuperAdmin users can list users and update assignable roles. Fleet write endpoints now require role membership, with the incident/status endpoint restricted to `Admin` only as agreed. The vehicle detail UI exposes status and incident work-order creation to Admin users. IdentityService and FleetService API builds passed; `npm.cmd run build` passed in `frontend/fleet-portal` (with the existing large-chunk advisory). Added `FleetService.Tests`; the initial 25 tests covered endpoint/controller authorization metadata and ASP.NET role requirement allow/deny outcomes, including proving `SuperAdmin` does not pass the Admin-only incident role requirement. **2026-10-20 verification:** signed-token HTTP authorization and SQL Server persistence/rollback checks passed; see Incident Workflow HTTP/Database Verification below.
 
 ### Vehicle Driver Assignment API (2026-10-18)
 
@@ -240,6 +240,16 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - Added fuel-history E2E coverage and removed automatic account creation; authenticated checks now require `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` from the environment.
 - Local E2E run passed all seven required checks, including fuel capacity, maintenance history, fuel history, and unknown registration. It reused the configured existing account and created no new account.
 - Next: add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
+
+### Incident Workflow HTTP/Database Verification (Complete, 2026-10-20)
+
+- Scope: exercise the vehicle status endpoint through signed JWT authentication and verify the Admin-only rule, persisted vehicle/work-order updates, and rollback when the work-order write fails.
+- Existing implementation already requires the `Admin` role and writes the vehicle status plus unplanned maintenance record in one `SaveChangesAsync` call; this task adds missing HTTP/database verification.
+- Added opt-in Kestrel/JWT/SQL Server integration tests for anonymous rejection, non-Admin denial, Admin persistence, and rollback after a deliberately invalid work-order insert.
+- Local environment check: the configured SQL Server container was available after running the test command with local database access.
+- Validation: `dotnet test services/fleet-service/FleetService.Tests/FleetService.Tests.csproj --no-restore` passed against `SmartFleetDb`: 42 passed, 0 failed, 0 skipped. This includes anonymous 401, signed non-Admin 403, signed Admin persistence of both status and work order, and rollback after a SQL constraint failure.
+- The HTTP/database tests require `FLEET_TEST_CONNECTION_STRING` to point to a migrated, disposable SQL Server database; they skip with an explicit reason when it is unset or unavailable. Each test removes its temporary vehicle and related work orders.
+- Status: complete; the FleetService test suite passed with the configured local SQL Server database.
 
 ---
 
