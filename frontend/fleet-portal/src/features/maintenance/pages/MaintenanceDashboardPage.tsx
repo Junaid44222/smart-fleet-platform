@@ -183,15 +183,12 @@ const MaintenanceDashboardPage: React.FC = () => {
     };
   }, [records]);
 
-  const sortedRecords = useMemo(
-    () => [...records].sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()),
-    [records],
-  );
-
   const columns = [
     {
       id: 'serviceType',
       label: 'Service',
+      searchValue: (row: MaintenanceRecord) => `${row.serviceType} ${row.description}`,
+      sortValue: (row: MaintenanceRecord) => row.serviceType,
       render: (row: MaintenanceRecord) => (
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.serviceType}</Typography>
@@ -202,21 +199,29 @@ const MaintenanceDashboardPage: React.FC = () => {
     {
       id: 'scheduledDate',
       label: 'Scheduled',
+      searchValue: (row: MaintenanceRecord) => `${row.scheduledDate} ${formatDate(row.scheduledDate)}`,
+      sortValue: (row: MaintenanceRecord) => new Date(row.scheduledDate),
       render: (row: MaintenanceRecord) => <Typography variant="body2">{formatDate(row.scheduledDate)}</Typography>,
     },
     {
       id: 'vendor',
       label: 'Vendor',
+      searchValue: (row: MaintenanceRecord) => row.vendor,
+      sortValue: (row: MaintenanceRecord) => row.vendor,
       render: (row: MaintenanceRecord) => <Typography variant="body2">{row.vendor || 'Unassigned'}</Typography>,
     },
     {
       id: 'cost',
       label: 'Cost',
+      searchValue: (row: MaintenanceRecord) => currencyFormatter.format(Number(row.cost || 0)),
+      sortValue: (row: MaintenanceRecord) => Number(row.cost || 0),
       render: (row: MaintenanceRecord) => <Typography variant="body2">{currencyFormatter.format(Number(row.cost || 0))}</Typography>,
     },
     {
       id: 'status',
       label: 'Status',
+      searchValue: (row: MaintenanceRecord) => row.status,
+      sortValue: (row: MaintenanceRecord) => row.status,
       render: (row: MaintenanceRecord) => (
         <Chip
           label={row.status}
@@ -228,6 +233,8 @@ const MaintenanceDashboardPage: React.FC = () => {
     {
       id: 'actions',
       label: 'Actions',
+      searchable: false,
+      sortable: false,
       render: (row: MaintenanceRecord) => (
         <Box sx={{ display: 'flex' }}>
           {userCanUpdate && <Button size="small" startIcon={<Edit />} onClick={() => openEditForm(row)}>Edit</Button>}
@@ -256,9 +263,11 @@ const MaintenanceDashboardPage: React.FC = () => {
 
       <DataTable
         columns={columns}
-        rows={sortedRecords}
+        rows={records}
         getRowId={(row) => row.id}
         loading={loading}
+        initialSort={{ columnId: 'scheduledDate', direction: 'asc' }}
+        searchPlaceholder="Quick search maintenance records..."
         emptyMessage="No maintenance records are available yet."
       />
 

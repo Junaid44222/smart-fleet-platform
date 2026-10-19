@@ -7,9 +7,10 @@ interface FilterOption {
 }
 
 interface FilterBarProps {
-  searchValue: string;
-  onSearchChange: (value: string) => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  searchEnabled?: boolean;
   statusValue?: string;
   onStatusChange?: (value: string) => void;
   statusOptions?: FilterOption[];
@@ -19,6 +20,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
+  searchEnabled = true,
   statusValue,
   onStatusChange,
   statusOptions = [],
@@ -31,13 +33,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
       mb: 2,
     }}
   >
-    <TextField
-      fullWidth
-      size="small"
-      placeholder={searchPlaceholder}
-      value={searchValue}
-      onChange={(event) => onSearchChange(event.target.value)}
-    />
+    {searchEnabled && onSearchChange && (
+      <TextField
+        fullWidth
+        size="small"
+        placeholder={searchPlaceholder}
+        value={searchValue ?? ''}
+        onChange={(event) => onSearchChange(event.target.value)}
+      />
+    )}
     {statusOptions.length > 0 && onStatusChange && (
       <TextField
         select

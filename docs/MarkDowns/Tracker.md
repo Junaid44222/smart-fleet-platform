@@ -663,7 +663,7 @@ Priority: High
 ### Frontend Design Alignment
 
 Status:
-In Progress
+Completed
 
 Tasks:
 
@@ -675,6 +675,12 @@ Tasks:
 * [x] Wire Maintenance and Fuel pages to APIs
 * [x] Build AI Assistant page
 * [x] Replace local vehicle-driver assignment storage with backend assignment API
+* [x] Add quick search, sortable columns, and pagination to all fleet portal lists
+  * [x] Apply shared controls to vehicle, driver, maintenance, fuel, and user lists.
+  * [x] Preserve existing default date ordering for maintenance and fuel records.
+  * [x] Verify frontend build, lint, and available tests.
+
+Verification: `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` passed. The production bundle still reports the existing large-chunk advisory.
 
 Estimated:
 3-5 Days

@@ -56,7 +56,6 @@ const VehicleListPage: React.FC = () => {
   const [error, setError] = useState('');
 
   // Filters state
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Dialog state
@@ -213,23 +212,20 @@ const VehicleListPage: React.FC = () => {
     }
   };
 
-  // Client-side filtering logic
+  // Status remains a separate filter; DataTable provides the shared quick search.
   const filteredVehicles = vehicles.filter((vehicle) => {
-    const matchesSearch =
-      vehicle.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
-      vehicle.manufacturer.toLowerCase().includes(search.toLowerCase()) ||
-      vehicle.model.toLowerCase().includes(search.toLowerCase());
-
     const matchesStatus =
       statusFilter === 'all' || vehicle.status.toLowerCase() === statusFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus;
+    return matchesStatus;
   });
 
   const columns = [
     {
       id: 'vehicleNumber',
       label: 'Registration Number',
+      searchValue: (row: Vehicle) => row.vehicleNumber,
+      sortValue: (row: Vehicle) => row.vehicleNumber,
       render: (row: Vehicle) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
           {row.vehicleNumber}
@@ -239,6 +235,8 @@ const VehicleListPage: React.FC = () => {
     {
       id: 'makeModel',
       label: 'Make & Model',
+      searchValue: (row: Vehicle) => `${row.manufacturer} ${row.model}`,
+      sortValue: (row: Vehicle) => `${row.manufacturer} ${row.model}`,
       render: (row: Vehicle) => (
         <Typography variant="body2">
           {row.manufacturer} {row.model}
@@ -248,16 +246,22 @@ const VehicleListPage: React.FC = () => {
     {
       id: 'year',
       label: 'Year',
+      searchValue: (row: Vehicle) => String(row.year),
+      sortValue: (row: Vehicle) => row.year,
       render: (row: Vehicle) => <Typography variant="body2">{row.year}</Typography>,
     },
     {
       id: 'fuelCapacity',
       label: 'Fuel Capacity',
+      searchValue: (row: Vehicle) => `${row.fuelCapacity} L`,
+      sortValue: (row: Vehicle) => row.fuelCapacity,
       render: (row: Vehicle) => <Typography variant="body2">{row.fuelCapacity} L</Typography>,
     },
     {
       id: 'status',
       label: 'Status',
+      searchValue: (row: Vehicle) => row.status,
+      sortValue: (row: Vehicle) => row.status,
       render: (row: Vehicle) => (
         <StatusBadge status={toVehicleStatus(row.status)} />
       ),
@@ -265,6 +269,8 @@ const VehicleListPage: React.FC = () => {
     {
       id: 'actions',
       label: 'Actions',
+      searchable: false,
+      sortable: false,
       render: (row: Vehicle) => (
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="View Details">
@@ -327,9 +333,7 @@ const VehicleListPage: React.FC = () => {
       ) : (
         <>
           <FilterBar
-            searchValue={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search by number, make, model..."
+            searchEnabled={false}
             statusValue={statusFilter}
             onStatusChange={setStatusFilter}
             statusOptions={statusOptions}

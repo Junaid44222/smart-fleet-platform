@@ -134,20 +134,19 @@ const FuelDashboardPage: React.FC = () => {
     };
   }, [records]);
 
-  const sortedRecords = useMemo(
-    () => [...records].sort((a, b) => new Date(b.fuelDate).getTime() - new Date(a.fuelDate).getTime()),
-    [records],
-  );
-
   const columns = [
     {
       id: 'fuelDate',
       label: 'Date',
+      searchValue: (row: FuelRecord) => `${row.fuelDate} ${formatDate(row.fuelDate)}`,
+      sortValue: (row: FuelRecord) => new Date(row.fuelDate),
       render: (row: FuelRecord) => <Typography variant="body2">{formatDate(row.fuelDate)}</Typography>,
     },
     {
       id: 'vehicleId',
       label: 'Vehicle',
+      searchValue: (row: FuelRecord) => row.vehicle?.vehicleNumber ?? row.vehicleId,
+      sortValue: (row: FuelRecord) => row.vehicle?.vehicleNumber ?? row.vehicleId,
       render: (row: FuelRecord) => (
         <Typography variant="body2">
           {row.vehicle?.vehicleNumber ?? row.vehicleId.slice(0, 8)}
@@ -157,21 +156,29 @@ const FuelDashboardPage: React.FC = () => {
     {
       id: 'quantity',
       label: 'Quantity',
+      searchValue: (row: FuelRecord) => `${row.quantity} L`,
+      sortValue: (row: FuelRecord) => Number(row.quantity || 0),
       render: (row: FuelRecord) => <Typography variant="body2">{numberFormatter.format(Number(row.quantity || 0))} L</Typography>,
     },
     {
       id: 'cost',
       label: 'Cost',
+      searchValue: (row: FuelRecord) => currencyFormatter.format(Number(row.cost || 0)),
+      sortValue: (row: FuelRecord) => Number(row.cost || 0),
       render: (row: FuelRecord) => <Typography variant="body2">{currencyFormatter.format(Number(row.cost || 0))}</Typography>,
     },
     {
       id: 'odometerReading',
       label: 'Odometer',
+      searchValue: (row: FuelRecord) => `${row.odometerReading} km`,
+      sortValue: (row: FuelRecord) => Number(row.odometerReading || 0),
       render: (row: FuelRecord) => <Typography variant="body2">{numberFormatter.format(Number(row.odometerReading || 0))} km</Typography>,
     },
     {
       id: 'actions',
       label: 'Actions',
+      searchable: false,
+      sortable: false,
       render: (row: FuelRecord) => <Box sx={{ display: 'flex' }}>
         {userCanUpdate && <Button size="small" startIcon={<Edit />} onClick={() => openEditForm(row)}>Edit</Button>}
         {userCanDelete && <Button size="small" color="error" startIcon={<DeleteOutlined />} onClick={() => setDeletingRecord(row)}>Delete</Button>}
@@ -198,9 +205,11 @@ const FuelDashboardPage: React.FC = () => {
 
       <DataTable
         columns={columns}
-        rows={sortedRecords}
+        rows={records}
         getRowId={(row) => row.id}
         loading={loading}
+        initialSort={{ columnId: 'fuelDate', direction: 'desc' }}
+        searchPlaceholder="Quick search fuel records..."
         emptyMessage="No fuel records are available yet."
       />
 

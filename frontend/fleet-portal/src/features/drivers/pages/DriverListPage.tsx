@@ -4,9 +4,6 @@ import { useSelector } from 'react-redux';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -21,6 +18,7 @@ import {
 } from '@mui/material';
 import { DeleteOutlined, Edit } from '@mui/icons-material';
 import PageHeader from '../../../components/PageHeader';
+import DataTable from '../../../components/DataTable';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver } from '../../../api/fleetApi';
 import type { Driver } from '../../../api/types';
 import { canCreateDriver, canDeleteDriver, canUpdateDriver } from '../../../auth/rolePermissions';
@@ -201,6 +199,67 @@ const DriverListPage: React.FC = () => {
     }
   };
 
+  const columns = [
+    {
+      id: 'fullName',
+      label: 'Driver',
+      searchValue: (row: Driver) => `${row.firstName} ${row.lastName} ${row.employeeCode}`,
+      sortValue: (row: Driver) => `${row.firstName} ${row.lastName}`,
+      render: (row: Driver) => <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.firstName} {row.lastName}</Typography>,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      searchValue: (row: Driver) => row.email,
+      sortValue: (row: Driver) => row.email,
+      render: (row: Driver) => <Typography variant="body2">{row.email}</Typography>,
+    },
+    {
+      id: 'phoneNumber',
+      label: 'Phone',
+      searchValue: (row: Driver) => row.phoneNumber,
+      sortValue: (row: Driver) => row.phoneNumber,
+      render: (row: Driver) => <Typography variant="body2">{row.phoneNumber}</Typography>,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      searchValue: (row: Driver) => row.status,
+      sortValue: (row: Driver) => row.status,
+      render: (row: Driver) => <Typography variant="body2">{row.status}</Typography>,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      searchable: false,
+      sortable: false,
+      render: (row: Driver) => (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {userCanUpdateDriver && (
+            <Tooltip title="Edit driver">
+              <IconButton aria-label={`Edit ${row.firstName} ${row.lastName}`} onClick={(event) => {
+                event.stopPropagation();
+                handleOpenEditDialog(row);
+              }}>
+                <Edit fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {userCanDeleteDriver && (
+            <Tooltip title="Delete driver">
+              <IconButton color="error" aria-label={`Delete ${row.firstName} ${row.lastName}`} onClick={(event) => {
+                event.stopPropagation();
+                setDriverToDelete(row);
+              }}>
+                <DeleteOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      ),
+    },
+  ];
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <PageHeader
@@ -216,63 +275,18 @@ const DriverListPage: React.FC = () => {
         }
       />
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-          <CircularProgress />
-        </Box>
+        <DataTable columns={columns} rows={drivers} getRowId={(row) => row.id} loading />
       ) : error ? (
         <Typography color="error">{error}</Typography>
       ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 3 }}>
-          {drivers.map((driver) => (
-            <Card
-              key={driver.id}
-              onClick={() => navigate(`/drivers/${driver.id}`)}
-              sx={{
-                borderRadius: 3,
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 6,
-                },
-              }}
-            >
-              <CardContent>
-                {(userCanUpdateDriver || userCanDeleteDriver) && (
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    {userCanUpdateDriver && (
-                      <Tooltip title="Edit driver">
-                        <IconButton aria-label={`Edit ${driver.firstName} ${driver.lastName}`} onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenEditDialog(driver);
-                        }}>
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {userCanDeleteDriver && (
-                      <Tooltip title="Delete driver">
-                        <IconButton color="error" aria-label={`Delete ${driver.firstName} ${driver.lastName}`} onClick={(event) => {
-                          event.stopPropagation();
-                          setDriverToDelete(driver);
-                        }}>
-                          <DeleteOutlined fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                )}
-                <Typography variant="h6">{driver.firstName} {driver.lastName}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {driver.email}
-                </Typography>
-                <Typography variant="subtitle2" sx={{ mt: 1 }}>
-                  Status: {driver.status}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
+        <DataTable
+          columns={columns}
+          rows={drivers}
+          getRowId={(row) => row.id}
+          onRowClick={(row) => navigate(`/drivers/${row.id}`)}
+          searchPlaceholder="Quick search drivers..."
+          emptyMessage="No drivers are available yet."
+        />
       )}
 
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">

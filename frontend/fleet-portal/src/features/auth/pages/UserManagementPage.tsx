@@ -5,23 +5,17 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
   MenuItem,
-  Paper,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
 } from '@mui/material';
 import PageHeader from '../../../components/PageHeader';
+import DataTable from '../../../components/DataTable';
 import { assignableRoles, deleteManagedUser, fetchManagedUsers, updateUserRole } from '../../../api/identityApi';
 import type { ManagedUser } from '../../../api/identityApi';
 import { canDeleteUsers } from '../../../auth/rolePermissions';
@@ -97,81 +91,95 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
+  const columns = [
+    {
+      id: 'fullName',
+      label: 'Name',
+      searchValue: (row: ManagedUser) => row.fullName,
+      sortValue: (row: ManagedUser) => row.fullName,
+      render: (row: ManagedUser) => <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.fullName}</Typography>,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      searchValue: (row: ManagedUser) => row.email,
+      sortValue: (row: ManagedUser) => row.email,
+      render: (row: ManagedUser) => <Typography variant="body2">{row.email}</Typography>,
+    },
+    {
+      id: 'role',
+      label: 'Role',
+      searchValue: (row: ManagedUser) => row.role,
+      sortValue: (row: ManagedUser) => row.role,
+      render: (row: ManagedUser) => {
+        const roleCanBeAssigned = assignableRoles.includes(row.role as typeof assignableRoles[number]);
+        return roleCanBeAssigned ? (
+          <FormControl size="small" sx={{ minWidth: 210 }}>
+            <Select
+              aria-label={`Role for ${row.fullName}`}
+              value={selectedRoles[row.id] ?? row.role}
+              onChange={(event) => setSelectedRoles((current) => ({
+                ...current,
+                [row.id]: event.target.value,
+              }))}
+            >
+              {assignableRoles.map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}
+            </Select>
+          </FormControl>
+        ) : <Typography variant="body2">{row.role} (protected)</Typography>;
+      },
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right' as const,
+      width: 220,
+      searchable: false,
+      sortable: false,
+      render: (row: ManagedUser) => {
+        const roleCanBeAssigned = assignableRoles.includes(row.role as typeof assignableRoles[number]);
+        const roleChanged = selectedRoles[row.id] !== row.role;
+        return (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={!roleCanBeAssigned || !roleChanged || savingUserId === row.id}
+              onClick={() => void saveRole(row)}
+            >
+              {savingUserId === row.id ? 'Saving…' : 'Save'}
+            </Button>
+            {userCanDeleteUsers && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<DeleteOutlined />}
+                disabled={deletingUserId === row.id}
+                onClick={() => setDeletingUser(row)}
+              >
+                Delete
+              </Button>
+            )}
+          </Box>
+        );
+      },
+    },
+  ];
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <PageHeader title="User Management" subtitle="Assign fleet roles to registered users." />
       {error && <Alert severity="error">{error}</Alert>}
       {success && <Alert severity="success">{success}</Alert>}
-      {loading ? (
-        <Box sx={{ display: 'grid', placeItems: 'center', py: 6 }}><CircularProgress /></Box>
-      ) : (
-        <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
-          <Table aria-label="User roles">
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map((user) => {
-                const roleCanBeAssigned = assignableRoles.includes(user.role as typeof assignableRoles[number]);
-                const roleChanged = selectedRoles[user.id] !== user.role;
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.fullName}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      {roleCanBeAssigned ? (
-                        <FormControl size="small" sx={{ minWidth: 210 }}>
-                          <Select
-                            aria-label={`Role for ${user.fullName}`}
-                            value={selectedRoles[user.id] ?? user.role}
-                            onChange={(event) => setSelectedRoles((current) => ({
-                              ...current,
-                              [user.id]: event.target.value,
-                            }))}
-                          >
-                            {assignableRoles.map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}
-                          </Select>
-                        </FormControl>
-                      ) : <Typography variant="body2">{user.role} (protected)</Typography>}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        disabled={!roleCanBeAssigned || !roleChanged || savingUserId === user.id}
-                        onClick={() => void saveRole(user)}
-                      >
-                        {savingUserId === user.id ? 'Saving…' : 'Save'}
-                      </Button>
-                      {userCanDeleteUsers && (
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          size="small"
-                          startIcon={<DeleteOutlined />}
-                          sx={{ ml: 1 }}
-                          disabled={deletingUserId === user.id}
-                          onClick={() => setDeletingUser(user)}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {users.length === 0 && (
-                <TableRow><TableCell colSpan={4}>No registered users.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Paper>
-      )}
+      <DataTable
+        columns={columns}
+        rows={users}
+        getRowId={(row) => row.id}
+        loading={loading}
+        searchPlaceholder="Quick search users..."
+        emptyMessage="No registered users."
+      />
       <Dialog open={Boolean(deletingUser)} onClose={() => !deletingUserId && setDeletingUser(null)}>
         <DialogTitle>Delete user?</DialogTitle>
         <DialogContent>
