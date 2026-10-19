@@ -54,7 +54,7 @@ Completion: Phase 1 (Testing) = 25% | Phase 2 (Issues Fix) = 0% | Phase 3 (Valid
 - [x] Fleet vehicle detail endpoint `/fleet/Vehicles/{id}` validated through gateway
 - [x] Fleet maintenance records list endpoint `/fleet/MaintenanceRecords` validated through gateway
 - [x] Fleet fuel records list endpoint `/fleet/FuelRecords` validated through gateway
-- [ ] No maintenance/fuel records present yet to validate detail endpoints
+- [x] Maintenance/fuel detail endpoints validated with temporary database-backed test records (2026-10-20; see `IncidentWorkflowHttpTests`)
 
 ### ✅ Gateway Routing Validated
 **API Gateway (Ocelot) - Port 5000**
@@ -350,7 +350,7 @@ Status: Completed
   * [x] Cover authenticated create, list/detail read, update, and delete over HTTP.
 * [x] Health check endpoint (`/health`, `/health/ready`)
 
-Verification (2026-10-20): Maintenance and Fuel API create/list/detail/update/soft-delete workflows passed over HTTP against the configured Fleet SQL database. Full `FleetService.Tests` run: 67 passed, 0 failed.
+Verification (2026-10-20): Maintenance and Fuel API create/list/detail/update/soft-delete workflows passed over HTTP against the configured Fleet SQL database. The earlier full DB-backed `FleetService.Tests` run passed 67/67. Current local run without `FLEET_TEST_CONNECTION_STRING`: 65 passed, 14 DB-backed tests skipped; the targeted maintenance/fuel workflow checks also skipped cleanly. The prior DB-backed run remains the detail workflow verification.
 
 ---
 

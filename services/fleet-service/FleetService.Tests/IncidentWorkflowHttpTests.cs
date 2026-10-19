@@ -28,7 +28,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
-using Xunit.Sdk;
 
 namespace FleetService.Tests;
 
@@ -108,7 +107,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task SignedAdminRequest_PersistsVehicleStatusAndIncidentWorkOrder()
     {
         await EnsureConfiguredAsync();
@@ -137,7 +136,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task SignedNonAdminRequest_IsForbiddenAndDoesNotChangeVehicle()
     {
         await EnsureConfiguredAsync();
@@ -160,7 +159,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task AnonymousRequest_IsRejectedByAuthenticationMiddleware()
     {
         await EnsureConfiguredAsync();
@@ -171,7 +170,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Theory]
+    [FleetDatabaseTheory]
     [InlineData("MaintenanceRecords")]
     [InlineData("FuelRecords")]
     public async Task RecordDetailEndpoints_RequireAuthentication(string route)
@@ -182,7 +181,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task MaintenanceDetailEndpoint_ReturnsPersistedRecordForViewer()
     {
         await EnsureConfiguredAsync();
@@ -205,7 +204,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task MissingMaintenanceDetailEndpoint_ReturnsNotFound()
     {
         await EnsureConfiguredAsync();
@@ -215,7 +214,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task FuelDetailEndpoint_ReturnsPersistedRecordForViewer()
     {
         await EnsureConfiguredAsync();
@@ -238,7 +237,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task MissingFuelDetailEndpoint_ReturnsNotFound()
     {
         await EnsureConfiguredAsync();
@@ -248,7 +247,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task MaintenanceRecordsApi_SupportsCreateListDetailUpdateAndDelete()
     {
         await EnsureConfiguredAsync();
@@ -327,7 +326,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task FuelRecordsApi_SupportsCreateListDetailUpdateAndDelete()
     {
         await EnsureConfiguredAsync();
@@ -400,7 +399,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task FailedWorkOrderInsert_RollsBackVehicleStatusChange()
     {
         await EnsureConfiguredAsync();
@@ -426,7 +425,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task DriverTripReads_ReturnOnlyTripsAssignedToAuthenticatedDriver()
     {
         await EnsureConfiguredAsync();
@@ -455,7 +454,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task DriverCanStartAndCompleteOnlyTheirAssignedTrip()
     {
         await EnsureConfiguredAsync();
@@ -493,7 +492,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [FleetDatabaseFact]
     public async Task TripScheduleCanBeEditedAndSoftDeletedWithAdministratorOnlyDeletion()
     {
         await EnsureConfiguredAsync();
@@ -538,15 +537,37 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
     {
         if (string.IsNullOrWhiteSpace(_connectionString))
         {
-            throw new SkipException(
-                "Set FLEET_TEST_CONNECTION_STRING to a migrated, disposable FleetService SQL Server database to run HTTP/database integration tests.");
+            throw new InvalidOperationException(
+                "FLEET_TEST_CONNECTION_STRING must point to a migrated, disposable FleetService SQL Server database.");
         }
 
         await using var context = CreateContext();
         if (!await context.Database.CanConnectAsync())
         {
-            throw new SkipException(
-                "The configured FleetService SQL Server database is unavailable; HTTP/database integration checks were skipped.");
+            throw new InvalidOperationException(
+                "The configured FleetService SQL Server database is unavailable.");
+        }
+    }
+
+    private sealed class FleetDatabaseFactAttribute : FactAttribute
+    {
+        public FleetDatabaseFactAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FLEET_TEST_CONNECTION_STRING")))
+            {
+                Skip = "Set FLEET_TEST_CONNECTION_STRING to a migrated, disposable FleetService SQL Server database.";
+            }
+        }
+    }
+
+    private sealed class FleetDatabaseTheoryAttribute : TheoryAttribute
+    {
+        public FleetDatabaseTheoryAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FLEET_TEST_CONNECTION_STRING")))
+            {
+                Skip = "Set FLEET_TEST_CONNECTION_STRING to a migrated, disposable FleetService SQL Server database.";
+            }
         }
     }
 
