@@ -432,6 +432,13 @@ Status: In Progress
 
 Role access verification: the router, navigation, and fleet list/detail actions use the shared role policy; `npm.cmd run test:permissions` verifies the full role/action matrix. Live integration verification is partial: AI and gateway health returned HTTP 200, while authenticated Fleet/AI checks could not run because no E2E credentials were configured.
 
+### Live Service Smoke Check (2026-10-20)
+
+- `scripts/e2e/run-e2e.ps1`: AI gateway health and direct AI health passed (HTTP 200). The required Fleet Vehicles and four authenticated AI prompt checks were skipped because `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` are not configured; the script correctly exited non-zero.
+- Additional live checks: Fleet liveness and readiness returned HTTP 200; frontend root returned HTTP 200; anonymous Fleet Vehicles returned HTTP 401 as expected.
+- Identity Service `/health` returned HTTP 404; the service is reachable but does not expose that health route.
+- Result: live service coverage remains partial. Keep `Integration testing against live services` open until authenticated Fleet and AI flows run with dedicated E2E credentials. The browser session was minimized, so no UI interaction was performed.
+
 Completion Date:
 2026-07-06
 
