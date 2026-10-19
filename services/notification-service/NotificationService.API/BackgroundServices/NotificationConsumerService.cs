@@ -27,16 +27,19 @@ public class NotificationConsumerService : BackgroundService
         var config = new ConsumerConfig
         {
             BootstrapServers = _configuration["Kafka:BootstrapServers"],
-            GroupId = "notification-group",
+            GroupId = _configuration["Kafka:GroupId"] ?? "notification-group",
             AutoOffsetReset = AutoOffsetReset.Earliest,
             AllowAutoCreateTopics = true
         };
 
         using var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
 
-        consumer.Subscribe("vehicle-created");
-        consumer.Subscribe("maintenance-created");
-        consumer.Subscribe("maintenance-completed");
+        consumer.Subscribe(new[]
+        {
+            _configuration["Kafka:Topics:VehicleCreated"] ?? "vehicle-created",
+            _configuration["Kafka:Topics:MaintenanceCreated"] ?? "maintenance-created",
+            _configuration["Kafka:Topics:MaintenanceCompleted"] ?? "maintenance-completed"
+        });
 
         _logger.LogInformation("Notification Kafka consumer started.");
 
@@ -73,7 +76,7 @@ public class NotificationConsumerService : BackgroundService
 
         try
         {
-            message = NotificationMapper.ToNotificationMessage(topic, payload);
+            message = NotificationMapper.ToNotificationMessage(GetEventType(topic), payload);
         }
         catch (Exception ex)
         {
@@ -90,5 +93,25 @@ public class NotificationConsumerService : BackgroundService
         {
             _logger.LogError(ex, "Failed to dispatch notification for topic {Topic}", topic);
         }
+    }
+
+    private string GetEventType(string topic)
+    {
+        if (topic == (_configuration["Kafka:Topics:VehicleCreated"] ?? "vehicle-created"))
+        {
+            return "vehicle-created";
+        }
+
+        if (topic == (_configuration["Kafka:Topics:MaintenanceCreated"] ?? "maintenance-created"))
+        {
+            return "maintenance.created";
+        }
+
+        if (topic == (_configuration["Kafka:Topics:MaintenanceCompleted"] ?? "maintenance-completed"))
+        {
+            return "maintenance.completed";
+        }
+
+        return topic;
     }
 }

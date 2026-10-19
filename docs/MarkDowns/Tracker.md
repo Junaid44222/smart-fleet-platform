@@ -386,7 +386,9 @@ Status: Completed
 * [x] Startup validation for provider secrets
 * [x] Unit tests passing
 * [x] Integration test scaffold created
-* [ ] End-to-end Kafka integration tests (optional)
+* [x] End-to-end Kafka integration test (opt-in)
+
+Verification (2026-10-20): replaced the producer-only scaffold with a Kafka producer-to-consumer test that verifies event mapping and notification dispatch through a fake sender. The test uses isolated topics and consumer groups, is skipped by default, and runs with `RUN_KAFKA_INTEGRATION=1` and optional `KAFKA_BOOTSTRAP`. Against the local broker, the opt-in test passed (1/1); the default suite passed (7 passed, 1 skipped). Test/build output was isolated under the system temp directory because the running Notification Service holds its normal build files open.
 
 Completion Date:
 2026-07-06
