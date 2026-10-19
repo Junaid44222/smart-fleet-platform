@@ -27,3 +27,8 @@ export const updateUserRole = async (userId: string, role: string) => {
   const response = await apiClient.put<ApiResponse<null>>(`/identity/Auth/users/${userId}/role`, { role });
   return response.data;
 };
+
+export const deleteManagedUser = async (userId: string) => {
+  const response = await apiClient.delete<ApiResponse<null>>(`/identity/Auth/users/${userId}`);
+  return response.data;
+};

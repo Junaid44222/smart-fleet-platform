@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { DeleteOutlined } from '@mui/icons-material';
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   MenuItem,
   Paper,
@@ -16,16 +22,21 @@ import {
   Typography,
 } from '@mui/material';
 import PageHeader from '../../../components/PageHeader';
-import { assignableRoles, fetchManagedUsers, updateUserRole } from '../../../api/identityApi';
+import { assignableRoles, deleteManagedUser, fetchManagedUsers, updateUserRole } from '../../../api/identityApi';
 import type { ManagedUser } from '../../../api/identityApi';
+import { canDeleteUsers } from '../../../auth/rolePermissions';
 
 const UserManagementPage: React.FC = () => {
+  const userRole = useSelector((state: { auth: { userRole: string } }) => state.auth.userRole);
+  const userCanDeleteUsers = canDeleteUsers(userRole);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [deletingUser, setDeletingUser] = useState<ManagedUser | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const loadUsers = async () => {
     setError('');
@@ -63,6 +74,29 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
+  const deleteUser = async () => {
+    if (!deletingUser || !userCanDeleteUsers) return;
+    setDeletingUserId(deletingUser.id);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteManagedUser(deletingUser.id);
+      setUsers((currentUsers) => currentUsers.filter((user) => user.id !== deletingUser.id));
+      setSelectedRoles((currentRoles) => {
+        const updatedRoles = { ...currentRoles };
+        delete updatedRoles[deletingUser.id];
+        return updatedRoles;
+      });
+      setSuccess(`Deleted ${deletingUser.fullName}.`);
+      setDeletingUser(null);
+    } catch (deleteError: unknown) {
+      const apiMessage = (deleteError as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setError(apiMessage || `Unable to delete ${deletingUser.fullName}.`);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <PageHeader title="User Management" subtitle="Assign fleet roles to registered users." />
@@ -78,7 +112,7 @@ const UserManagementPage: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
-                <TableCell align="right">Action</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -114,6 +148,19 @@ const UserManagementPage: React.FC = () => {
                       >
                         {savingUserId === user.id ? 'Saving…' : 'Save'}
                       </Button>
+                      {userCanDeleteUsers && (
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          startIcon={<DeleteOutlined />}
+                          sx={{ ml: 1 }}
+                          disabled={deletingUserId === user.id}
+                          onClick={() => setDeletingUser(user)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -125,6 +172,18 @@ const UserManagementPage: React.FC = () => {
           </Table>
         </Paper>
       )}
+      <Dialog open={Boolean(deletingUser)} onClose={() => !deletingUserId && setDeletingUser(null)}>
+        <DialogTitle>Delete user?</DialogTitle>
+        <DialogContent>
+          <Typography>Delete {deletingUser?.fullName} ({deletingUser?.email})? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingUser(null)} disabled={Boolean(deletingUserId)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void deleteUser()} disabled={Boolean(deletingUserId)}>
+            {deletingUserId ? 'Deleting...' : 'Delete user'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

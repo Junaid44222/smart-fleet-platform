@@ -190,6 +190,50 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpDelete("users/{id:guid}")]
+    [Authorize(Roles = UserRoles.SuperAdmin)]
+    public async Task<IActionResult> DeleteUser(Guid id)
+    {
+        if (Guid.TryParse(User.FindFirst("UserId")?.Value, out var actingUserId) &&
+            actingUserId == id)
+        {
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "SuperAdmins cannot delete their own account."
+            });
+        }
+
+        var user = await _context.Users.FindAsync(id);
+        if (user is null)
+        {
+            return NotFound(new AuthResponseDto
+            {
+                Success = false,
+                Message = "User not found."
+            });
+        }
+
+        if (string.Equals(user.Role, UserRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase) &&
+            await _context.Users.CountAsync(candidate => candidate.Role == UserRoles.SuperAdmin) <= 1)
+        {
+            return Conflict(new AuthResponseDto
+            {
+                Success = false,
+                Message = "The last SuperAdmin account cannot be deleted."
+            });
+        }
+
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
+
+        return Ok(new AuthResponseDto
+        {
+            Success = true,
+            Message = "User deleted successfully."
+        });
+    }
+
     private bool VerifyPassword(
         ApplicationUser user,
         string password,

@@ -21,4 +21,5 @@ export const canCreateFuel = (role: string) => hasRole(role, fleetManagerRoles);
 export const canUpdateFuel = (role: string) => hasRole(role, fleetManagerRoles);
 export const canDeleteFuel = (role: string) => hasRole(role, administratorRoles);
 export const canManageFuel = (role: string) => hasRole(role, fleetManagerRoles);
-export const canChangeVehicleStatus = (role: string) => role === 'Admin';
+export const canChangeVehicleStatus = (role: string) => hasRole(role, administratorRoles);
+export const canDeleteUsers = (role: string) => role === 'SuperAdmin';

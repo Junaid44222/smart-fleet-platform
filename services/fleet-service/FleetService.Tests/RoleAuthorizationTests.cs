@@ -14,11 +14,11 @@ namespace FleetService.Tests;
 public class RoleAuthorizationTests
 {
     [Fact]
-    public void VehicleStatusChange_IsRestrictedToAdminOnly()
+    public void VehicleStatusChange_IsRestrictedToAdministrators()
     {
         var authorization = GetMethodAuthorization<VehiclesController>("ChangeStatus");
 
-        Assert.Equal(FleetRoles.Admin, authorization.Roles);
+        Assert.Equal(FleetRoles.Administrators, authorization.Roles);
     }
 
     [Theory]
@@ -63,21 +63,22 @@ public class RoleAuthorizationTests
     }
 
     [Fact]
-    public void IdentityRoleManagement_IsAdministratorOnly_AndRegistrationRemainsPublic()
+    public void IdentityRoleManagement_IsAdministratorOnly_AndUserDeletionIsSuperAdminOnly()
     {
         var expectedRoles = UserRoles.Administrators;
         Assert.Equal(expectedRoles, GetMethodAuthorization<AuthController>("GetUsers").Roles);
         Assert.Equal(expectedRoles, GetMethodAuthorization<AuthController>("UpdateUserRole").Roles);
+        Assert.Equal(UserRoles.SuperAdmin, GetMethodAuthorization<AuthController>("DeleteUser").Roles);
         Assert.Null(typeof(AuthController).GetMethod("Register")!.GetCustomAttribute<AuthorizeAttribute>());
     }
 
     [Theory]
     [InlineData("Admin", true)]
-    [InlineData("SuperAdmin", false)]
+    [InlineData("SuperAdmin", true)]
     [InlineData("FleetManager", false)]
     [InlineData("Dispatcher", false)]
     [InlineData("Viewer", false)]
-    public async Task VehicleIncidentPolicy_AllowsOnlyAdmin(string role, bool expected)
+    public async Task VehicleStatusPolicy_AllowsAdministrators(string role, bool expected)
     {
         var authorization = CreateAuthorizationService();
         var user = CreatePrincipal(role);
@@ -85,7 +86,25 @@ public class RoleAuthorizationTests
         var result = await authorization.AuthorizeAsync(
             user,
             resource: null,
-            new RolesAuthorizationRequirement([FleetRoles.Admin]));
+            new RolesAuthorizationRequirement(FleetRoles.Administrators.Split(',')));
+
+        Assert.Equal(expected, result.Succeeded);
+    }
+
+    [Theory]
+    [InlineData("SuperAdmin", true)]
+    [InlineData("Admin", false)]
+    [InlineData("FleetManager", false)]
+    [InlineData("Dispatcher", false)]
+    public async Task UserDeletionPolicy_AllowsOnlySuperAdmin(string role, bool expected)
+    {
+        var authorization = CreateAuthorizationService();
+        var user = CreatePrincipal(role);
+
+        var result = await authorization.AuthorizeAsync(
+            user,
+            resource: null,
+            new RolesAuthorizationRequirement([UserRoles.SuperAdmin]));
 
         Assert.Equal(expected, result.Succeeded);
     }

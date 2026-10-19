@@ -230,7 +230,7 @@ public class VehiclesController : ControllerBase
     }
 
     [HttpPut("{id:guid}/status")]
-    [Authorize(Roles = FleetRoles.Admin)]
+    [Authorize(Roles = FleetRoles.Administrators)]
     public async Task<IActionResult> ChangeStatus(
         Guid id,
         [FromBody] ChangeVehicleStatusDto request,

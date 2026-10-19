@@ -266,6 +266,15 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - Verification: frontend permission tests passed (9/9), lint passed, production build passed, and FleetService tests passed (54/54). Production build reports the existing large JavaScript chunk advisory; .NET restore reports existing dependency vulnerability/version warnings.
 - Commit: completed (`feat(fleet): add CRUD actions to fleet lists`).
 
+### SuperAdmin User Deletion and Vehicle Status Control (Complete — 2026-10-20)
+
+- Scope: allow only SuperAdmin to delete users; allow Admin and SuperAdmin to manually change vehicle status.
+- Added a SuperAdmin-only user delete endpoint and User Management confirmation action. The API prevents self-deletion and deletion of the last SuperAdmin account.
+- Vehicle status changes now allow Admin and SuperAdmin in both the Fleet API policy and frontend action permissions.
+- Verification: frontend permission tests passed (9/9), lint passed, production build passed, and FleetService tests passed (58/58), including role policy checks for user deletion and vehicle status.
+- Existing build advisories remain: the frontend bundle exceeds the configured chunk size guidance and .NET reports existing package vulnerability/version warnings.
+- Commit: completed (`feat(auth): add SuperAdmin user deletion and vehicle status access`).
+
 ---
 
 # Completed Tasks
