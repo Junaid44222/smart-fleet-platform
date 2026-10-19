@@ -438,8 +438,14 @@ Role access verification: the router, navigation, and fleet list/detail actions 
 
 - `scripts/e2e/run-e2e.ps1`: AI gateway health and direct AI health passed (HTTP 200). The required Fleet Vehicles and four authenticated AI prompt checks were skipped because `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` are not configured; the script correctly exited non-zero.
 - Additional live checks: Fleet liveness and readiness returned HTTP 200; frontend root returned HTTP 200; anonymous Fleet Vehicles returned HTTP 401 as expected.
-- Identity Service `/health` returned HTTP 404; the service is reachable but does not expose that health route.
-- Result: live service coverage remains partial. Keep `Integration testing against live services` open until authenticated Fleet and AI flows run with dedicated E2E credentials. The browser session was minimized, so no UI interaction was performed.
+- Identity Service `/health` and `/health/ready` returned HTTP 404 on the already-running process, exposing a missing health endpoint.
+- Result: live service coverage remains partial. Keep `Integration testing against live services` open until the updated Identity process is restarted and authenticated Fleet/AI flows run with dedicated E2E credentials. The browser session was minimized, so no UI interaction was performed.
+
+### Identity Service Health Checks (2026-10-20)
+
+- Added unauthenticated `/health` liveness and `/health/ready` readiness endpoints. Readiness checks connectivity to the Identity SQL database and returns named JSON check results.
+- Added `Identity Service Health` to `scripts/e2e/config.json` so the smoke suite verifies the service directly.
+- Verification: IdentityService API build passed. An isolated instance on port 5157 returned HTTP 200 for both health routes; readiness reported the database healthy. The existing process on port 5057 still returns 404 until restarted with the updated build.
 
 Completion Date:
 2026-07-06

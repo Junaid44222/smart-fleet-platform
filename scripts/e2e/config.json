@@ -11,6 +11,11 @@
       "required": true
     },
     {
+      "name": "Identity Service Health",
+      "url": "http://localhost:5057/health",
+      "required": true
+    },
+    {
       "name": "Fleet Vehicles (gateway)",
       "url": "http://localhost:5000/fleet/Vehicles",
       "required": true,

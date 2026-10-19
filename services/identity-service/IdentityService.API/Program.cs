@@ -1,11 +1,14 @@
 using System.Text;
 using IdentityService.API.Data;
 using IdentityService.API.Extensions;
+using IdentityService.API.HealthChecks;
 using IdentityService.API.Models;
 using IdentityService.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SmartFleet.Common.Configuration;
@@ -72,6 +75,9 @@ builder.Services.AddDbContext<AuthDbContext>(
             });
     });
 
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"], timeout: TimeSpan.FromSeconds(5));
+
 builder.Services.AddScoped<
     IJwtTokenService,
     JwtTokenService>();
@@ -130,5 +136,28 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = HealthStatus.Healthy.ToString(),
+    service = "IdentityService"
+}));
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(entry => new
+            {
+                name = entry.Key,
+                status = entry.Value.Status.ToString(),
+                description = entry.Value.Description
+            })
+        });
+    }
+});
 
 app.Run();
