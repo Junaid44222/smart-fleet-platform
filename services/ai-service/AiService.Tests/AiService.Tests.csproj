@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AiService.API\AiService.API.csproj" />
     <ProjectReference Include="..\AiService.Application\AiService.Application.csproj" />
     <ProjectReference Include="..\AiService.Infrastructure\AiService.Infrastructure.csproj" />
   </ItemGroup>

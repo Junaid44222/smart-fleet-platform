@@ -2,10 +2,15 @@ using AiService.Application.DTOs;
 using AiService.Infrastructure.Clients;
 using AiService.Infrastructure.Options;
 using AiService.Infrastructure.Services;
+using AiService.API.Controllers;
+using AiService.API.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -120,6 +125,123 @@ namespace AiService.Tests
         }
 
         [Fact]
+        public async Task PlanActionAsync_ParsesPermittedTripDraftWithoutExecutingIt()
+        {
+            var handler = new StubMessageHandler
+            {
+                ResponseContent = "{\"choices\":[{\"message\":{\"content\":\"{\\\"action\\\":\\\"scheduleTrip\\\",\\\"assistantMessage\\\":\\\"Review this trip draft.\\\",\\\"trip\\\":{\\\"vehicleNumber\\\":\\\"MH01AB1005\\\",\\\"driverEmail\\\":\\\"driver@example.test\\\",\\\"source\\\":\\\"Pune\\\",\\\"destination\\\":\\\"Mumbai\\\",\\\"startDate\\\":\\\"2026-11-01T09:00:00Z\\\",\\\"endDate\\\":\\\"2026-11-01T13:00:00Z\\\"},\\\"maintenance\\\":null}\"}}]}"
+            };
+            using var httpClient = new HttpClient(handler);
+            var service = new AzureOpenAiAssistantService(
+                httpClient,
+                Options.Create(new AzureOpenAiOptions()),
+                Options.Create(new AiProviderOptions
+                {
+                    Provider = "Ollama",
+                    Endpoint = "http://localhost:11434/v1",
+                    Model = "qwen3:0.6b"
+                }));
+
+            var plan = await service.PlanActionAsync(
+                new AiActionPlanRequestDto { Message = "Schedule this trip" },
+                ["scheduleTrip"],
+                CancellationToken.None);
+
+            Assert.Equal("scheduleTrip", plan.Action);
+            Assert.Equal("MH01AB1005", plan.Trip?.VehicleNumber);
+            Assert.Equal("driver@example.test", plan.Trip?.DriverEmail);
+            Assert.Null(plan.Maintenance);
+            Assert.Contains("Permitted actions", handler.RequestBody);
+        }
+
+        [Fact]
+        public async Task PlanActionAsync_RejectsModelActionOutsideSignedInRolesPermissions()
+        {
+            var handler = new StubMessageHandler
+            {
+                ResponseContent = "{\"choices\":[{\"message\":{\"content\":\"{\\\"action\\\":\\\"scheduleTrip\\\",\\\"assistantMessage\\\":\\\"Ready.\\\",\\\"trip\\\":{},\\\"maintenance\\\":null}\"}}]}"
+            };
+            using var httpClient = new HttpClient(handler);
+            var service = new AzureOpenAiAssistantService(
+                httpClient,
+                Options.Create(new AzureOpenAiOptions()),
+                Options.Create(new AiProviderOptions
+                {
+                    Provider = "Ollama",
+                    Endpoint = "http://localhost:11434/v1",
+                    Model = "qwen3:0.6b"
+                }));
+
+            var plan = await service.PlanActionAsync(
+                new AiActionPlanRequestDto { Message = "Schedule this trip" },
+                ["createMaintenance"],
+                CancellationToken.None);
+
+            Assert.Equal("none", plan.Action);
+            Assert.Null(plan.Trip);
+            Assert.Contains("isn't allowed", plan.AssistantMessage);
+        }
+
+        [Fact]
+        public async Task PlanActionAsync_UsesExplicitUserIntentEvenWhenModelOmitsAction()
+        {
+            var handler = new StubMessageHandler
+            {
+                ResponseContent = "{\"choices\":[{\"message\":{\"content\":\"{\\\"action\\\":\\\"none\\\",\\\"assistantMessage\\\":\\\"Please review.\\\",\\\"trip\\\":null,\\\"maintenance\\\":null}\"}}]}"
+            };
+            using var httpClient = new HttpClient(handler);
+            var service = new AzureOpenAiAssistantService(
+                httpClient,
+                Options.Create(new AzureOpenAiOptions()),
+                Options.Create(new AiProviderOptions
+                {
+                    Provider = "Ollama",
+                    Endpoint = "http://localhost:11434/v1",
+                    Model = "qwen3:0.6b"
+                }));
+
+            var plan = await service.PlanActionAsync(
+                new AiActionPlanRequestDto { Message = "Please schedule a trip from Pune to Mumbai." },
+                ["scheduleTrip"],
+                CancellationToken.None);
+
+            Assert.Equal("scheduleTrip", plan.Action);
+            Assert.NotNull(plan.Trip);
+            Assert.Equal("Please review.", plan.AssistantMessage);
+        }
+
+        [Fact]
+        public void AiAssistantEndpointsRequireAuthenticatedFleetUsers()
+        {
+            Assert.NotNull(Attribute.GetCustomAttribute(
+                typeof(AiAssistantController), typeof(AuthorizeAttribute)));
+        }
+
+        [Theory]
+        [InlineData("Admin", true, true)]
+        [InlineData("SuperAdmin", true, true)]
+        [InlineData("FleetManager", true, true)]
+        [InlineData("Dispatcher", true, false)]
+        [InlineData("MaintenanceTechnician", false, true)]
+        [InlineData("SafetyOfficer", false, false)]
+        [InlineData("Viewer", false, false)]
+        [InlineData("Driver", false, false)]
+        public void AiActionPermissions_MatchFleetWriteRoles(
+            string role,
+            bool canScheduleTrips,
+            bool canCreateMaintenance)
+        {
+            var user = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.Role, role)],
+                "test"));
+
+            var actions = AiActionPermissions.GetPermittedActions(user);
+
+            Assert.Equal(canScheduleTrips, actions.Contains(AiActionPermissions.ScheduleTrip));
+            Assert.Equal(canCreateMaintenance, actions.Contains(AiActionPermissions.CreateMaintenance));
+        }
+
+        [Fact]
         public async Task FleetVehicleContextProvider_ReturnsVerifiedDetails_AndForwardsBearerToken()
         {
             var handler = new StubFleetDataHandler();
@@ -206,6 +328,9 @@ namespace AiService.Tests
 
         private sealed class StubMessageHandler : HttpMessageHandler
         {
+            public string ResponseContent { get; init; } =
+                "{\"choices\":[{\"message\":{\"content\":\"Local model response\"}}]}";
+
             public Uri RequestUri { get; private set; } = new("about:blank");
 
             public string Authorization { get; private set; } = string.Empty;
@@ -227,10 +352,7 @@ namespace AiService.Tests
 
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(
-                        "{\"choices\":[{\"message\":{\"content\":\"Local model response\"}}]}",
-                        Encoding.UTF8,
-                        "application/json")
+                    Content = new StringContent(ResponseContent, Encoding.UTF8, "application/json")
                 };
             }
         }

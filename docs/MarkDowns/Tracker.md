@@ -4,18 +4,21 @@
 
 Last Updated: 2026-10-20
 
-### Trip Fuel Usage on Fuel Dashboard (2026-10-20)
-
-- [x] Inspected FleetService data for vehicle `MH01AB1006`: completed trip `TRP-20261019204023-8333dda7` records 100 km and 25 L fuel consumed; the vehicle has no refueling records.
-- [x] Added a separate Completed Trip Fuel Usage section to the Fuel Dashboard, sourced from completed trip data and showing fuel consumed, distance, trip number, completion date, and vehicle.
-- [x] Kept trip usage separate from refueling volume and spend so trip completion does not fabricate a purchase cost or odometer reading.
-- [x] Verified `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` (9/9 passed); the production build retains the existing large-chunk advisory.
-- [x] Confirmed the live Fleet API returns the completed trip usage for `MH01AB1006` and confirmed it is now represented in the dashboard's completed-trip section.
-- [x] Committed the implementation and tracker update as `debc6ee` (`Show completed trip fuel usage on dashboard`).
-
 Project Status: In Progress
 
 Overall Completion: 84% (Frontend: 65% | Backend: 75% | Integration: 20%)
+
+Repository orientation: See [ProjectContextGraph.md](./ProjectContextGraph.md) for the current architecture map, code locations, implementation status, and verification caveats.
+
+### AI Fleet Agent MVP (2026-10-20) — In Progress
+
+- [x] Add authenticated, structured AI action planning for trip scheduling and maintenance creation.
+- [x] Let permitted users review and edit generated drafts, then explicitly confirm before the portal calls existing Fleet APIs.
+- [x] Keep Fleet API role policies as the final authorization boundary; add regression tests for AI authentication and safe action-plan parsing.
+- [x] Frontend build/lint and permission matrix (9/9) pass; AI service tests pass (21/21).
+- [x] Live local API smoke: anonymous planning request returned 401; Dispatcher received a trip draft; Viewer received no draft and a role-denial message.
+- [x] Updated the project context graph with the agent flow and verification evidence.
+- [ ] Commit the implementation and both project status documents (excluding unrelated pre-existing tracker edits).
 
 ---
 
@@ -63,7 +66,7 @@ Completion: Phase 1 (Testing) = 25% | Phase 2 (Issues Fix) = 0% | Phase 3 (Valid
 - [x] Fleet vehicle detail endpoint `/fleet/Vehicles/{id}` validated through gateway
 - [x] Fleet maintenance records list endpoint `/fleet/MaintenanceRecords` validated through gateway
 - [x] Fleet fuel records list endpoint `/fleet/FuelRecords` validated through gateway
-- [x] Maintenance/fuel detail endpoints validated with temporary database-backed test records (2026-10-20; see `IncidentWorkflowHttpTests`)
+- [ ] No maintenance/fuel records present yet to validate detail endpoints
 
 ### ✅ Gateway Routing Validated
 **API Gateway (Ocelot) - Port 5000**
@@ -188,9 +191,9 @@ Implementation checklist:
 - [x] Add an Admin-only incident operation that marks a vehicle out of service and creates an unplanned work order in one database save.
 - [x] Add Admin UI for status changes and incident maintenance creation.
 - [x] Add regression tests for declared role policies and allow/deny outcomes for Fleet and Identity role requirements.
-- [x] Verify HTTP allow/deny behavior with signed role tokens and verify incident persistence plus transaction rollback against a database.
+- [ ] Verify HTTP allow/deny behavior with signed role tokens and verify incident persistence plus transaction rollback against a database.
 
-Implementation progress (2026-10-18): Identity login returns the stored role, public registration always assigns `Dispatcher`, and Admin/SuperAdmin users can list users and update assignable roles. Fleet write endpoints now require role membership, with the incident/status endpoint restricted to `Admin` only as agreed. The vehicle detail UI exposes status and incident work-order creation to Admin users. IdentityService and FleetService API builds passed; `npm.cmd run build` passed in `frontend/fleet-portal` (with the existing large-chunk advisory). Added `FleetService.Tests`; the initial 25 tests covered endpoint/controller authorization metadata and ASP.NET role requirement allow/deny outcomes, including proving `SuperAdmin` does not pass the Admin-only incident role requirement. **2026-10-20 verification:** signed-token HTTP authorization and SQL Server persistence/rollback checks passed; see Incident Workflow HTTP/Database Verification below.
+Implementation progress (2026-10-18): Identity login returns the stored role, public registration always assigns `Dispatcher`, and Admin/SuperAdmin users can list users and update assignable roles. Fleet write endpoints now require role membership, with the incident/status endpoint restricted to `Admin` only as agreed. The vehicle detail UI exposes status and incident work-order creation to Admin users. IdentityService and FleetService API builds passed; `npm.cmd run build` passed in `frontend/fleet-portal` (with the existing large-chunk advisory). Added `FleetService.Tests`; 25 tests now pass, covering endpoint/controller authorization metadata and ASP.NET role requirement allow/deny outcomes, including proving `SuperAdmin` does not pass the Admin-only incident role requirement. Signed-token HTTP pipeline and database persistence/rollback verification remain outstanding. A compatible SQLite provider is not cached and NuGet network access is unavailable in this environment.
 
 ### Vehicle Driver Assignment API (2026-10-18)
 
@@ -248,57 +251,7 @@ Implementation progress (2026-10-18): Identity login returns the stored role, pu
 - The E2E runner now supports authenticated JSON POST requests, per-endpoint timeouts, and response-content assertions.
 - Added fuel-history E2E coverage and removed automatic account creation; authenticated checks now require `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` from the environment.
 - Local E2E run passed all seven required checks, including fuel capacity, maintenance history, fuel history, and unknown registration. It reused the configured existing account and created no new account.
-- Next task (Complete, 2026-10-20): add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
-  - [x] Cover maintenance and fuel detail HTTP endpoints, including authorization and not-found behavior.
-  - [x] Audit frontend write actions and hide or disable actions users' roles cannot perform.
-  - [x] Run relevant backend/frontend checks and record results.
-  - Backend HTTP verification: signed-in Viewer can read maintenance/fuel details (200); missing records return 404; anonymous requests return 401.
-  - Frontend role guards now match API policy for vehicle creation, driver creation, vehicle/driver assignment, Admin/SuperAdmin vehicle status changes, and Admin/SuperAdmin user management. The navigation link, route guard, and profile role badge use the same policy helpers.
-  - Validation: FleetService tests 48 passed, 0 failed, 0 skipped; frontend permission matrix 9 passed; `npm.cmd run lint` and `npm.cmd run build` passed. Build retains the existing large-chunk advisory.
-
-### Incident Workflow HTTP/Database Verification (Complete, 2026-10-20)
-
-- Scope: exercise the vehicle status endpoint through signed JWT authentication and verify the Admin/SuperAdmin administrator policy, persisted vehicle/work-order updates, and rollback when the work-order write fails.
-- Existing implementation requires the `Admin` or `SuperAdmin` role and writes the vehicle status plus unplanned maintenance record in one `SaveChangesAsync` call; this task adds missing HTTP/database verification.
-- Added opt-in Kestrel/JWT/SQL Server integration tests for anonymous rejection, non-administrator denial, Admin persistence, and rollback after a deliberately invalid work-order insert.
-- Local environment check: the configured SQL Server container was available after running the test command with local database access.
-- Validation: `dotnet test services/fleet-service/FleetService.Tests/FleetService.Tests.csproj --no-restore` passed against `SmartFleetDb`: 42 passed, 0 failed, 0 skipped. This includes anonymous 401, signed non-Admin 403, signed Admin persistence of both status and work order, and rollback after a SQL constraint failure.
-- The HTTP/database tests require `FLEET_TEST_CONNECTION_STRING` to point to a migrated, disposable SQL Server database; they skip with an explicit reason when it is unset or unavailable. Each test removes its temporary vehicle and related work orders.
-- Status: complete; the FleetService test suite passed with the configured local SQL Server database.
-
-### Fleet List CRUD Coverage (Complete — 2026-10-20)
-
-- Scope: provide Add, Update, and Delete actions on vehicle, driver, maintenance, and fuel lists; Admin and SuperAdmin must have access to all actions.
-- Added create/update/delete controls and forms to Vehicle, Driver, Maintenance, and Fuel lists. Admin and SuperAdmin can use all list actions; existing FleetManager and MaintenanceTechnician create/update permissions remain aligned with the API policies.
-- Added vehicle update/delete API operations, case-insensitive registration uniqueness checks, and a delete guard that preserves vehicles with assignments, trips, maintenance, or fuel history.
-- Added role matrix and backend vehicle CRUD service tests; API authorization metadata now covers vehicle update/delete.
-- Verification: frontend permission tests passed (9/9), lint passed, production build passed, and FleetService tests passed (54/54). Production build reports the existing large JavaScript chunk advisory; .NET restore reports existing dependency vulnerability/version warnings.
-- Commit: completed (`feat(fleet): add CRUD actions to fleet lists`).
-
-### SuperAdmin User Deletion and Vehicle Status Control (Complete — 2026-10-20)
-
-- Scope: allow only SuperAdmin to delete users; allow Admin and SuperAdmin to manually change vehicle status.
-- Added a SuperAdmin-only user delete endpoint and User Management confirmation action. The API prevents self-deletion and deletion of the last SuperAdmin account.
-- Vehicle status changes now allow Admin and SuperAdmin in both the Fleet API policy and frontend action permissions.
-- Verification: frontend permission tests passed (9/9), lint passed, production build passed, and FleetService tests passed (58/58), including role policy checks for user deletion and vehicle status.
-- Existing build advisories remain: the frontend bundle exceeds the configured chunk size guidance and .NET reports existing package vulnerability/version warnings.
-- Commit: completed (`feat(auth): add SuperAdmin user deletion and vehicle status access`).
-
-### SuperAdmin Vehicle Status 403 Follow-up (Complete — 2026-10-20)
-
-- Source and authorization tests confirm the status endpoint allows `Admin,SuperAdmin`.
-- Local diagnosis found FleetService.API still running from 00:45 with binaries older than the authorization change; that stale process held the build outputs open and continued returning 403.
-- Stopped the stale FleetService instance, rebuilt the API from current source, and restarted it. It is listening on port 5081.
-- Live check: the status endpoint through the gateway returns 401 with no token, as expected; backend role-policy tests verify SuperAdmin is authorized.
-- Commit: completed (`docs(tracker): record status policy runtime fix`).
-
-### Fleet Service Health Checks (Complete — 2026-10-20)
-
-- Scope: add `/health` liveness and `/health/ready` readiness endpoints; readiness must verify database connectivity.
-- Added public `/health` liveness response and `/health/ready` readiness check backed by SQL Server connectivity, with JSON health details and correct healthy/unhealthy HTTP status handling.
-- Verification: FleetService API build passed; live checks on the configured port returned `Healthy` for liveness and `Healthy` for readiness/database; FleetService test suite passed (58/58).
-- Existing package vulnerability/version warnings are unchanged.
-- Commit: completed (`feat(fleet): add liveness and readiness health checks`).
+- Next: add maintenance/fuel detail endpoint integration tests and role-based access checks in the frontend.
 
 ---
 
@@ -353,13 +306,9 @@ Status: Completed
 * [x] Dashboard Stats API
 * [x] Kafka Producer
 * [x] Kafka Consumer
-* [x] Maintenance API integration tests
-  * [x] Cover authenticated create, list/detail read, update, and delete over HTTP.
-* [x] Fuel API integration tests
-  * [x] Cover authenticated create, list/detail read, update, and delete over HTTP.
-* [x] Health check endpoint (`/health`, `/health/ready`)
-
-Verification (2026-10-20): Maintenance and Fuel API create/list/detail/update/soft-delete workflows passed over HTTP against the configured Fleet SQL database. The earlier full DB-backed `FleetService.Tests` run passed 67/67. Current local run without `FLEET_TEST_CONNECTION_STRING`: 65 passed, 14 DB-backed tests skipped; the targeted maintenance/fuel workflow checks also skipped cleanly. The prior DB-backed run remains the detail workflow verification.
+* [ ] Maintenance API integration tests
+* [ ] Fuel API integration tests
+* [ ] Health check endpoint
 
 ---
 
@@ -395,9 +344,7 @@ Status: Completed
 * [x] Startup validation for provider secrets
 * [x] Unit tests passing
 * [x] Integration test scaffold created
-* [x] End-to-end Kafka integration test (opt-in)
-
-Verification (2026-10-20): replaced the producer-only scaffold with a Kafka producer-to-consumer test that verifies event mapping and notification dispatch through a fake sender. The test uses isolated topics and consumer groups, is skipped by default, and runs with `RUN_KAFKA_INTEGRATION=1` and optional `KAFKA_BOOTSTRAP`. Against the local broker, the opt-in test passed (1/1); the default suite passed (7 passed, 1 skipped). Test/build output was isolated under the system temp directory because the running Notification Service holds its normal build files open.
+* [ ] End-to-end Kafka integration tests (optional)
 
 Completion Date:
 2026-07-06
@@ -438,23 +385,8 @@ Status: In Progress
 * [x] AI Assistant UI
 * [x] API contract audit for frontend routes
 * [ ] Integration testing against live services
-* [x] Role-based access in UI
-* [x] Driver mobile app (separate experience)
-
-Role access verification: the router, navigation, and fleet list/detail actions use the shared role policy; `npm.cmd run test:permissions` verifies the full role/action matrix. Live integration verification is partial: AI and gateway health returned HTTP 200, while authenticated Fleet/AI checks could not run because no E2E credentials were configured.
-
-### Live Service Smoke Check (2026-10-20)
-
-- `scripts/e2e/run-e2e.ps1`: AI gateway health and direct AI health passed (HTTP 200). The required Fleet Vehicles and four authenticated AI prompt checks were skipped because `E2E_AUTH_EMAIL` and `E2E_AUTH_PASSWORD` are not configured; the script correctly exited non-zero.
-- Additional live checks: Fleet liveness and readiness returned HTTP 200; frontend root returned HTTP 200; anonymous Fleet Vehicles returned HTTP 401 as expected.
-- Identity Service `/health` and `/health/ready` returned HTTP 404 on the already-running process, exposing a missing health endpoint.
-- Result: live service coverage remains partial. Keep `Integration testing against live services` open until the updated Identity process is restarted and authenticated Fleet/AI flows run with dedicated E2E credentials. The browser session was minimized, so no UI interaction was performed.
-
-### Identity Service Health Checks (2026-10-20)
-
-- Added unauthenticated `/health` liveness and `/health/ready` readiness endpoints. Readiness checks connectivity to the Identity SQL database and returns named JSON check results.
-- Added `Identity Service Health` to `scripts/e2e/config.json` so the smoke suite verifies the service directly.
-- Verification: IdentityService API build passed. An isolated instance on port 5157 returned HTTP 200 for both health routes; readiness reported the database healthy. The existing process on port 5057 still returns 404 until restarted with the updated build.
+* [ ] Role-based access in UI
+* [ ] Driver mobile app (separate experience)
 
 Completion Date:
 2026-07-06
@@ -693,7 +625,7 @@ Priority: High
 ### Frontend Design Alignment
 
 Status:
-Completed
+In Progress
 
 Tasks:
 
@@ -705,13 +637,6 @@ Tasks:
 * [x] Wire Maintenance and Fuel pages to APIs
 * [x] Build AI Assistant page
 * [x] Replace local vehicle-driver assignment storage with backend assignment API
-* [x] Add quick search, sortable columns, and pagination to all fleet portal lists
-* [x] Connect dashboard active-trip KPI and recent activity to persisted trip records
-  * [x] Apply shared controls to vehicle, driver, maintenance, fuel, and user lists.
-  * [x] Preserve existing default date ordering for maintenance and fuel records.
-  * [x] Verify frontend build, lint, and available tests.
-
-Verification: `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` passed. Dashboard trip display now derives the active count from non-deleted in-progress trips and includes trip lifecycle activity. A live authenticated request through the gateway returned `activeTrips: 1` and the matching trip activity after restarting the stale FleetService process. Added a DB-backed dashboard regression test; it compiled but was skipped because `FLEET_TEST_CONNECTION_STRING` is not configured. The local service needed a process-only `Encrypt=False` connection override to connect to SQL Server; no connection settings were committed. The production bundle still reports the existing large-chunk advisory.
 
 Estimated:
 3-5 Days
@@ -721,18 +646,13 @@ Estimated:
 ### Backend Gaps
 
 Status:
-Completed
+In Progress
 
 Tasks:
 
 * [x] Trip module (entity, API, events)
-* [x] Fleet Service health checks (`/health`, `/health/ready`)
-* [x] Phase 1 stabilization (centralized config, correlation ID logging)
-  * [x] Add a shared configuration defaults provider with environment variable overrides.
-  * [x] Add request correlation ID middleware to active APIs and the gateway.
-  * [x] Verify correlation ID behavior and service builds/tests.
-
-Verification: all solution projects build successfully; all 55 non-database FleetService tests pass. The 10 `IncidentWorkflowHttpTests` require `FLEET_TEST_CONNECTION_STRING` and were not runnable without a configured test database.
+* [ ] Fleet Service health checks (`/health`, `/health/ready`)
+* [ ] Phase 1 stabilization (centralized config, correlation ID logging)
 
 Estimated:
 2-4 Days
@@ -744,28 +664,24 @@ Estimated:
 ## Trip Management Module
 
 Status:
-Completed (2026-10-20)
+Not Started
 
 Priority:
 Medium
 
 Tasks:
 
-* [x] Create Trip entity and migration
-* [x] Complete Trip CRUD APIs (list/detail/create/update/soft-delete/start/complete/cancel)
-* [x] Publish Trip Kafka events
-* [x] Build Trip UI (manager + driver)
-
-Implementation (2026-10-20): added manager trip scheduling, assignment, update, lifecycle actions, and administrator-only soft delete. Added `trip-updated` and `trip-deleted` Kafka events. The driver mobile experience supports driver-scoped trip reads and start/complete actions.
-
-Verification: frontend production build and lint passed; frontend permission matrix passed (9/9); FleetService non-database suite passed (65/65). SQL-backed HTTP regression tests cover trip ownership and manager update/delete behavior but could not run because the configured SQL Server database is unavailable. Existing package advisories and frontend chunk-size guidance remain.
+* [ ] Create Trip entity and migration
+* [ ] Create Trip CRUD APIs
+* [ ] Publish Trip Kafka events
+* [ ] Build Trip UI (manager + driver)
 
 ---
 
 ## Driver Mobile Experience
 
 Status:
-Completed (2026-10-20)
+Not Started
 
 Priority:
 Medium
@@ -775,13 +691,9 @@ Design Reference:
 
 Tasks:
 
-* [x] Separate mobile layout with bottom navigation
-* [x] Active route card and driver quick actions
-* [x] Wire to trip APIs when available
-
-Implementation (2026-10-20): added a Driver-only mobile route with home, trips, and profile navigation; assigned-trip cards; start/complete actions; trip completion metrics; refresh and sign-out actions. Fleet trip reads are scoped by the authenticated email, and drivers can start or complete only their own assigned trips.
-
-Verification: frontend production build and lint passed; frontend permission tests passed (9/9); FleetService non-database suite passed (60/60). Added SQL-backed HTTP tests for driver trip visibility and ownership checks; those two tests could not run because the configured FleetService SQL Server database is unavailable. Existing package advisories and frontend chunk-size guidance remain.
+* [ ] Separate mobile layout with bottom navigation
+* [ ] Active route card and driver quick actions
+* [ ] Wire to trip APIs when available
 
 ---
 

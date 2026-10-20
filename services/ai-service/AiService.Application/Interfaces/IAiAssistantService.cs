@@ -11,4 +11,9 @@ public interface IAiAssistantService
     Task<AiResponseDto> AnalyzeFleetHealthAsync(
         FleetHealthAnalysisRequestDto request,
         CancellationToken cancellationToken);
+
+    Task<AiActionPlanDto> PlanActionAsync(
+        AiActionPlanRequestDto request,
+        IReadOnlyCollection<string> permittedActions,
+        CancellationToken cancellationToken);
 }
