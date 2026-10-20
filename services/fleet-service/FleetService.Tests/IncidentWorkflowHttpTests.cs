@@ -64,6 +64,7 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
         builder.Services.AddScoped<IMaintenanceRecordService, MaintenanceRecordService>();
         builder.Services.AddScoped<IFuelRecordRepository, FuelRecordRepository>();
         builder.Services.AddScoped<IFuelRecordService, FuelRecordService>();
+        builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
         builder.Services.AddScoped<ITripService, TripService>();
         builder.Services.AddSingleton<IKafkaProducer, NoOpKafkaProducer>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -526,6 +527,41 @@ public sealed class IncidentWorkflowHttpTests : IAsyncLifetime
             Assert.True(trip.IsDeleted);
             Assert.Equal("Updated pickup", trip.Source);
             Assert.Equal("Updated dropoff", trip.Destination);
+        }
+        finally
+        {
+            await DeleteDriverTripAsync(tripRecord);
+        }
+    }
+
+    [FleetDatabaseFact]
+    public async Task DashboardIncludesActiveTripCountAndRecentTripActivity()
+    {
+        await EnsureConfiguredAsync();
+        var tripRecord = await CreateDriverTripAsync("dashboard-trip@example.test");
+
+        try
+        {
+            int expectedActiveTrips;
+            await using (var context = CreateContext())
+            {
+                var trip = await context.Trips.SingleAsync(item => item.Id == tripRecord.TripId);
+                trip.Start(DateTime.UtcNow, "dashboard-test");
+                await context.SaveChangesAsync();
+                expectedActiveTrips = await context.Trips.CountAsync(item =>
+                    !item.IsDeleted && item.Status == Trip.InProgressStatus);
+            }
+
+            using var request = AuthenticatedGet("/api/Dashboard/stats", "FleetManager");
+            using var response = await _client!.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var data = json.RootElement.GetProperty("data");
+            Assert.Equal(expectedActiveTrips, data.GetProperty("stats").GetProperty("activeTrips").GetInt32());
+            Assert.Contains(
+                data.GetProperty("recentActivities").EnumerateArray(),
+                activity => activity.GetProperty("id").GetString() == tripRecord.TripId.ToString());
         }
         finally
         {

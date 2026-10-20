@@ -1,5 +1,6 @@
 using FleetService.Application.DTOs;
 using FleetService.Application.Interfaces;
+using FleetService.Domain.Entities;
 using FleetService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,6 +34,10 @@ public class DashboardRepository : IDashboardRepository
         var fuelRecords = await _context.FuelRecords
             .AsNoTracking()
             .Where(f => !f.IsDeleted)
+            .ToListAsync(cancellationToken);
+        var trips = await _context.Trips
+            .AsNoTracking()
+            .Where(trip => !trip.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var availableDrivers = drivers.Count(d =>
@@ -80,7 +85,8 @@ public class DashboardRepository : IDashboardRepository
             Stats = new DashboardStatsDto
             {
                 TotalVehicles = vehicles.Count,
-                ActiveTrips = 0,
+                ActiveTrips = trips.Count(trip =>
+                    trip.Status.Equals(Trip.InProgressStatus, StringComparison.OrdinalIgnoreCase)),
                 AvailableDrivers = availableDrivers,
                 MaintenanceDueCount = maintenanceDueCount,
                 MonthlyFuelCost = Math.Round(monthlyFuelCost, 2),
@@ -88,7 +94,7 @@ public class DashboardRepository : IDashboardRepository
             },
             VehicleStatusBreakdown = vehicleStatusBreakdown,
             MonthlyFuelCosts = monthlyFuelCosts,
-            RecentActivities = BuildRecentActivities(vehicles, drivers, maintenanceRecords)
+            RecentActivities = BuildRecentActivities(vehicles, drivers, maintenanceRecords, trips)
         };
     }
 
@@ -116,7 +122,8 @@ public class DashboardRepository : IDashboardRepository
     private static List<RecentActivityDto> BuildRecentActivities(
         IReadOnlyCollection<Domain.Entities.Vehicle> vehicles,
         IReadOnlyCollection<Domain.Entities.Driver> drivers,
-        IReadOnlyCollection<Domain.Entities.MaintenanceRecord> maintenanceRecords)
+        IReadOnlyCollection<Domain.Entities.MaintenanceRecord> maintenanceRecords,
+        IReadOnlyCollection<Trip> trips)
     {
         var activities = new List<RecentActivityDto>();
 
@@ -154,6 +161,24 @@ public class DashboardRepository : IDashboardRepository
                 Title = m.CompletedDate.HasValue ? "Maintenance completed" : "Maintenance scheduled",
                 Description = $"{m.ServiceType} - {m.Status}",
                 OccurredAt = m.CompletedDate ?? m.ScheduledDate
+            }));
+
+        activities.AddRange(trips
+            .OrderByDescending(trip => trip.UpdatedAt ?? trip.CreatedAt)
+            .Take(5)
+            .Select(trip => new RecentActivityDto
+            {
+                Id = trip.Id.ToString(),
+                Type = $"Trip{trip.Status}",
+                Title = trip.Status switch
+                {
+                    Trip.InProgressStatus => "Trip in progress",
+                    Trip.CompletedStatus => "Trip completed",
+                    Trip.CancelledStatus => "Trip cancelled",
+                    _ => "Trip scheduled"
+                },
+                Description = $"{trip.TripNumber}: {trip.Source} to {trip.Destination}",
+                OccurredAt = trip.ActualEndDate ?? trip.ActualStartDate ?? trip.UpdatedAt ?? trip.CreatedAt
             }));
 
         return activities

@@ -111,7 +111,7 @@ const DashboardPage: React.FC = () => {
           value={vehicleStatusBreakdown.find((item) => item.status.toLowerCase() === 'active')?.count ?? 0}
           icon={<VehicleIcon />}
         />
-        <KPIWidget title="Active Trips" value={stats.activeTrips} icon={<TripIcon />} subtitle="Trip module pending" />
+        <KPIWidget title="Active Trips" value={stats.activeTrips} icon={<TripIcon />} subtitle="Currently in progress" />
         <KPIWidget title="Drivers Available" value={stats.availableDrivers} icon={<DriverIcon />} />
         <KPIWidget
           title="Maintenance Due"
