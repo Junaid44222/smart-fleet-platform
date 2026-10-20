@@ -6,8 +6,8 @@ import { Add, AttachMoney, DeleteOutlined, Edit, LocalGasStation, Speed } from '
 import PageHeader from '../../../components/PageHeader';
 import DataTable from '../../../components/DataTable';
 import KPIWidget from '../../../components/KPIWidget';
-import { createFuelRecord, deleteFuelRecord, fetchFuelRecords, fetchVehicles, updateFuelRecord } from '../../../api/fleetApi';
-import type { FuelRecord, Vehicle } from '../../../api/types';
+import { createFuelRecord, deleteFuelRecord, fetchFuelRecords, fetchTrips, fetchVehicles, updateFuelRecord } from '../../../api/fleetApi';
+import type { DriverTrip, FuelRecord, Vehicle } from '../../../api/types';
 import { canCreateFuel, canDeleteFuel, canUpdateFuel } from '../../../auth/rolePermissions';
 
 type FuelForm = { vehicleId: string; fuelDate: string; quantity: string; cost: string; odometerReading: string };
@@ -33,9 +33,12 @@ const FuelDashboardPage: React.FC = () => {
   const userCanUpdate = canUpdateFuel(userRole);
   const userCanDelete = canDeleteFuel(userRole);
   const [records, setRecords] = useState<FuelRecord[]>([]);
+  const [completedTrips, setCompletedTrips] = useState<DriverTrip[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tripsLoading, setTripsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tripsError, setTripsError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FuelRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<FuelRecord | null>(null);
@@ -56,7 +59,19 @@ const FuelDashboardPage: React.FC = () => {
       }
     };
 
+    const loadTripUsage = async () => {
+      try {
+        const trips = await fetchTrips();
+        setCompletedTrips(trips.filter((trip) => trip.status.toLowerCase() === 'completed' && Number(trip.fuelConsumed || 0) > 0));
+      } catch {
+        setTripsError('Unable to load completed trip fuel usage at this time.');
+      } finally {
+        setTripsLoading(false);
+      }
+    };
+
     loadRecords();
+    loadTripUsage();
     void fetchVehicles().then(setVehicles).catch(() => setVehicles([]));
   }, []);
 
@@ -134,6 +149,49 @@ const FuelDashboardPage: React.FC = () => {
     };
   }, [records]);
 
+  const tripUsageSummary = useMemo(() => ({
+    fuelConsumed: completedTrips.reduce((sum, trip) => sum + Number(trip.fuelConsumed || 0), 0),
+    distance: completedTrips.reduce((sum, trip) => sum + Number(trip.distance || 0), 0),
+  }), [completedTrips]);
+
+  const tripColumns = [
+    {
+      id: 'actualEndDate',
+      label: 'Completed',
+      searchValue: (row: DriverTrip) => `${row.actualEndDate ?? row.endDate} ${formatDate(row.actualEndDate ?? row.endDate)}`,
+      sortValue: (row: DriverTrip) => new Date(row.actualEndDate ?? row.endDate),
+      render: (row: DriverTrip) => <Typography variant="body2">{formatDate(row.actualEndDate ?? row.endDate)}</Typography>,
+    },
+    {
+      id: 'tripNumber',
+      label: 'Trip',
+      searchValue: (row: DriverTrip) => row.tripNumber,
+      sortValue: (row: DriverTrip) => row.tripNumber,
+      render: (row: DriverTrip) => <Typography variant="body2">{row.tripNumber}</Typography>,
+    },
+    {
+      id: 'vehicleId',
+      label: 'Vehicle',
+      searchValue: (row: DriverTrip) => row.vehicle?.vehicleNumber ?? row.vehicleId,
+      sortValue: (row: DriverTrip) => row.vehicle?.vehicleNumber ?? row.vehicleId,
+      render: (row: DriverTrip) => <Typography variant="body2">{row.vehicle?.vehicleNumber ?? row.vehicleId.slice(0, 8)}</Typography>,
+    },
+    {
+      id: 'distance',
+      label: 'Distance',
+      searchValue: (row: DriverTrip) => `${row.distance ?? 0} km`,
+      sortValue: (row: DriverTrip) => Number(row.distance || 0),
+      render: (row: DriverTrip) => <Typography variant="body2">{numberFormatter.format(Number(row.distance || 0))} km</Typography>,
+    },
+    {
+      id: 'fuelConsumed',
+      label: 'Fuel consumed',
+      searchValue: (row: DriverTrip) => `${row.fuelConsumed ?? 0} L`,
+      sortValue: (row: DriverTrip) => Number(row.fuelConsumed || 0),
+      render: (row: DriverTrip) => <Typography variant="body2">{numberFormatter.format(Number(row.fuelConsumed || 0))} L</Typography>,
+    },
+  ];
+
   const columns = [
     {
       id: 'fuelDate',
@@ -199,6 +257,27 @@ const FuelDashboardPage: React.FC = () => {
         <KPIWidget title="Fuel Spend" value={currencyFormatter.format(summary.totalCost)} subtitle="Across recorded refuels" icon={<AttachMoney />} />
         <KPIWidget title="Fuel Volume" value={numberFormatter.format(summary.totalQuantity)} unit="L" subtitle={`${records.length} fuel records`} icon={<LocalGasStation />} />
         <KPIWidget title="Avg Cost" value={currencyFormatter.format(summary.averageCost)} unit="/ L" subtitle="Based on current records" icon={<Speed />} />
+      </Box>
+
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>Completed Trip Fuel Usage</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Fuel consumed and distance from completed trips. These usage figures are separate from refueling spend.
+        </Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2, mb: 2 }}>
+          <KPIWidget title="Trip Fuel Consumed" value={numberFormatter.format(tripUsageSummary.fuelConsumed)} unit="L" subtitle={`${completedTrips.length} completed trips`} icon={<LocalGasStation />} />
+          <KPIWidget title="Trip Distance" value={numberFormatter.format(tripUsageSummary.distance)} unit="km" subtitle="Across completed trips with fuel usage" icon={<Speed />} />
+        </Box>
+        {tripsError && <Alert severity="error" sx={{ mb: 2 }}>{tripsError}</Alert>}
+        <DataTable
+          columns={tripColumns}
+          rows={completedTrips}
+          getRowId={(row) => row.id}
+          loading={tripsLoading}
+          initialSort={{ columnId: 'actualEndDate', direction: 'desc' }}
+          searchPlaceholder="Quick search trip fuel usage..."
+          emptyMessage="No completed trips with fuel usage are available yet."
+        />
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}

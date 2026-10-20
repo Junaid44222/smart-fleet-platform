@@ -4,6 +4,15 @@
 
 Last Updated: 2026-10-20
 
+### Trip Fuel Usage on Fuel Dashboard (2026-10-20)
+
+- [x] Inspected FleetService data for vehicle `MH01AB1006`: completed trip `TRP-20261019204023-8333dda7` records 100 km and 25 L fuel consumed; the vehicle has no refueling records.
+- [x] Added a separate Completed Trip Fuel Usage section to the Fuel Dashboard, sourced from completed trip data and showing fuel consumed, distance, trip number, completion date, and vehicle.
+- [x] Kept trip usage separate from refueling volume and spend so trip completion does not fabricate a purchase cost or odometer reading.
+- [x] Verified `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` (9/9 passed); the production build retains the existing large-chunk advisory.
+- [x] Confirmed the live Fleet API returns the completed trip usage for `MH01AB1006` and confirmed it is now represented in the dashboard's completed-trip section.
+- [x] Committed the implementation and tracker update as `debc6ee` (`Show completed trip fuel usage on dashboard`).
+
 Project Status: In Progress
 
 Overall Completion: 84% (Frontend: 65% | Backend: 75% | Integration: 20%)
