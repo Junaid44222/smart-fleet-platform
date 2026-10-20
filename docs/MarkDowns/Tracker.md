@@ -702,7 +702,7 @@ Tasks:
   * [x] Preserve existing default date ordering for maintenance and fuel records.
   * [x] Verify frontend build, lint, and available tests.
 
-Verification: `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` passed. Dashboard trip display now derives the active count from non-deleted in-progress trips and includes trip lifecycle activity. Added a DB-backed dashboard regression test; the test compiled but was skipped in this run because `FLEET_TEST_CONNECTION_STRING` is not configured. The production bundle still reports the existing large-chunk advisory.
+Verification: `npm.cmd run build`, `npm.cmd run lint`, and `npm.cmd run test:permissions` passed. Dashboard trip display now derives the active count from non-deleted in-progress trips and includes trip lifecycle activity. A live authenticated request through the gateway returned `activeTrips: 1` and the matching trip activity after restarting the stale FleetService process. Added a DB-backed dashboard regression test; it compiled but was skipped because `FLEET_TEST_CONNECTION_STRING` is not configured. The local service needed a process-only `Encrypt=False` connection override to connect to SQL Server; no connection settings were committed. The production bundle still reports the existing large-chunk advisory.
 
 Estimated:
 3-5 Days
